@@ -73,6 +73,11 @@ _CATEGORY_SEVERITY_BASE = {
     'other'         : 3.0,
 }
 
+# Priority always sets a floor and ceiling on the final severity score.
+# e.g. a "critical" complaint can NEVER score below 8.0, regardless of category.
+_PRIORITY_FLOOR = {'low': 0.0, 'medium': 3.0, 'high': 6.0, 'critical': 8.0}
+_PRIORITY_CAP   = {'low': 4.0, 'medium': 6.5, 'high': 8.5, 'critical': 10.0}
+
 
 # ── AI Prompt Builder ──────────────────────────────────────────────────────
 
@@ -382,10 +387,12 @@ def categorize_complaint(title: str, description: str) -> dict:
     return result
 
 
-def compute_severity(title: str, description: str, category: str) -> float:
+def compute_severity(title: str, description: str, category: str, priority: str = 'medium') -> float:
     """
     Compute a 0–10 severity score for priority sorting.
-    Higher = more severe. Based on category base + critical keyword density.
+    Higher = more severe. Based on category base + critical keyword density,
+    then clamped to the floor/cap mandated by AI-determined priority so that
+    a 'critical' complaint can never score below 8.0 regardless of category.
     """
     text = (title + ' ' + description).lower()
     score = _CATEGORY_SEVERITY_BASE.get(category, 3.0)
@@ -393,8 +400,17 @@ def compute_severity(title: str, description: str, category: str) -> float:
     high_hits = sum(1 for kw in _HIGH_SEVERITY_KW if kw in text)
     score += min(high_hits * 0.5, 2.0)
 
-    final = round(min(max(score, 0.0), 10.0), 2)
-    logger.debug(f'Severity computed: {final} (category={category}, high_keyword_hits={high_hits})')
+    # Enforce priority floor and cap
+    floor = _PRIORITY_FLOOR.get(priority, 0.0)
+    cap   = _PRIORITY_CAP.get(priority, 10.0)
+    final = round(min(max(score, floor), cap), 2)
+
+    logger.debug(
+        f'Severity computed: {final} '
+        f'(category={category}, priority={priority}, '
+        f'base_score={_CATEGORY_SEVERITY_BASE.get(category, 3.0)}, '
+        f'high_keyword_hits={high_hits}, floor={floor}, cap={cap})'
+    )
     return final
 
 

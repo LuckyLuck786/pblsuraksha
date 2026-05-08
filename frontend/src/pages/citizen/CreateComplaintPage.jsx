@@ -99,7 +99,7 @@ const CreateComplaintPage = () => {
                             value={formData.title}
                             onChange={handleChange}
                             placeholder="e.g. Theft at MG Road bus stop"
-                            className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${errors.title ? 'border-red-400' : 'border-gray-300'}`}
+                            className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${errors.title ? 'border-red-400' : 'border-gray-300'}`}
                         />
                         {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
                     </div>
@@ -115,7 +115,7 @@ const CreateComplaintPage = () => {
                             onChange={handleChange}
                             rows={5}
                             placeholder="Describe what happened, who was involved, and any other relevant details..."
-                            className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${errors.description ? 'border-red-400' : 'border-gray-300'}`}
+                            className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${errors.description ? 'border-red-400' : 'border-gray-300'}`}
                         />
                         {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
                     </div>
@@ -184,7 +184,7 @@ const CreateComplaintPage = () => {
                             value={formData.incident_location}
                             onChange={handleChange}
                             placeholder="e.g. MG Road, Bangalore"
-                            className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${errors.incident_location ? 'border-red-400' : 'border-gray-300'}`}
+                            className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${errors.incident_location ? 'border-red-400' : 'border-gray-300'}`}
                         />
                         {errors.incident_location && <p className="text-red-500 text-xs mt-1">{errors.incident_location}</p>}
                     </div>
@@ -197,7 +197,7 @@ const CreateComplaintPage = () => {
                             value={formData.incident_address}
                             onChange={handleChange}
                             placeholder="Street, Area, City, Pincode"
-                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                     </div>
 

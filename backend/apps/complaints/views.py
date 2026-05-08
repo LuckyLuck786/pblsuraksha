@@ -87,7 +87,12 @@ class ComplaintListCreateView(generics.ListCreateAPIView):
             }
 
         try:
-            severity = compute_severity(title, complaint_data.get('description', ''), ai_result.get('category', 'other'))
+            severity = compute_severity(
+                title,
+                complaint_data.get('description', ''),
+                ai_result.get('category', 'other'),
+                ai_result.get('priority', 'medium'),
+            )
         except Exception as exc:
             logger.error(f'Severity computation failed: {exc}', exc_info=True)
             severity = 3.0

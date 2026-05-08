@@ -75,10 +75,6 @@ class Complaint(models.Model):
     ai_summary     = models.TextField(blank=True)
     severity_score = models.FloatField(default=0.0)   # 0–10 AI-computed score
 
-    # RAG validation metadata
-    rag_validated  = models.BooleanField(default=False)   # passed RAG consistency check
-    rag_corrected  = models.BooleanField(default=False)   # RAG changed the LLM's answer
-
     # Incident timing
     incident_date = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -143,7 +143,6 @@ export const intelligenceAPI = {
   getHotspots : ()                   => api.get('/intelligence/hotspots/'),
   getMapData  : ()                   => api.get('/intelligence/map-data/'),
   getInsights : ()                   => api.get('/intelligence/insights/'),
-  getRagStats : ()                   => api.get('/intelligence/rag-stats/'),   // RAG diagnostics
 };
 
 export default api;

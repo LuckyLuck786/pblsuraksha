@@ -92,12 +92,11 @@ def analyze_text(request):
 
     try:
         result   = categorize_complaint(title, description)
-        severity = compute_severity(title, description, result['category'])
+        severity = compute_severity(title, description, result['category'], result.get('priority', 'medium'))
         result['severity_score'] = severity
         logger.info(
             f'analyze_text result: cat={result["category"]}, pri={result["priority"]}, '
-            f'severity={severity}, rag_validated={result.get("rag_validated")}, '
-            f'rag_corrected={result.get("rag_corrected")}'
+            f'severity={severity}'
         )
         return Response(result)
     except Exception as exc:
@@ -146,27 +145,3 @@ def insights(request):
         return Response({'error': 'Failed to compute insights'}, status=500)
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def rag_stats(request):
-    """
-    GET /api/intelligence/rag-stats/
-    Returns current RAG vector store statistics (admin/authority only).
-    """
-    if request.user.role not in ('admin', 'authority'):
-        logger.warning(f'rag_stats: unauthorised access attempt by {request.user.username}')
-        return Response({'error': 'Admin/authority access required'}, status=403)
-
-    logger.info(f'rag_stats requested by {request.user.username}')
-    try:
-        from .rag import collection_stats, retrieve_similar
-        stats = collection_stats()
-
-        # Also include RAG correction stats from DB
-        total = Complaint.objects.count()
-        stats['total_complaints_in_db'] = total
-
-        return Response(stats)
-    except Exception as exc:
-        logger.error(f'rag_stats failed: {exc}', exc_info=True)
-        return Response({'error': 'RAG stats unavailable', 'detail': str(exc)}, status=500)

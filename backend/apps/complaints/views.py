@@ -75,7 +75,7 @@ class ComplaintListCreateView(generics.ListCreateAPIView):
 
         logger.info(f'New complaint submission by {user.username}: "{title[:60]}"')
 
-        # ── Intelligence Layer: auto-categorize, RAG-validate, compute severity ──
+        # ── Intelligence Layer: auto-categorize + compute severity ──────────
         try:
             ai_result = categorize_complaint(title, complaint_data.get('description', ''))
         except Exception as exc:
@@ -83,7 +83,6 @@ class ComplaintListCreateView(generics.ListCreateAPIView):
             ai_result = {
                 'category': 'other', 'priority': 'medium',
                 'summary': 'Auto-analysis unavailable.',
-                'rag_validated': False, 'rag_corrected': False,
             }
 
         try:
@@ -104,15 +103,12 @@ class ComplaintListCreateView(generics.ListCreateAPIView):
             ai_summary=ai_result.get('summary', ''),
             priority=ai_result.get('priority', 'medium'),
             severity_score=severity,
-            rag_validated=ai_result.get('rag_validated', False),
-            rag_corrected=ai_result.get('rag_corrected', False),
         )
 
         logger.info(
             f'Complaint saved: {complaint.complaint_id} | '
             f'cat={complaint.category} pri={complaint.priority} '
-            f'severity={severity} rag_validated={complaint.rag_validated} '
-            f'rag_corrected={complaint.rag_corrected} provider={ai_result.get("ai_provider", "?")}'
+            f'severity={severity} provider={ai_result.get("ai_provider", "?")}'
         )
 
         # Create initial update entry

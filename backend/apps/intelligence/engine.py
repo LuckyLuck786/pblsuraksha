@@ -8,12 +8,6 @@ Fallback chain:
   2. Groq API key 2  (llama-3.3-70b-versatile)
   3. Google Gemini   (gemini-2.0-flash)
   4. Rule-based keyword analysis
-
-RAG validation layer (after every LLM/rule-based call):
-  5. Retrieve similar past complaints from ChromaDB
-  6. Validate LLM result vs. retrieved majority
-  7. If mismatch → re-prompt LLM with retrieved context (correction round)
-  8. Return final result with rag_validated / rag_corrected flags
 """
 
 import re
@@ -254,110 +248,22 @@ def _rule_based_analyze(title: str, description: str) -> dict:
     }
 
 
-# ── RAG Validation Round ───────────────────────────────────────────────────
-
-def _run_rag_validation(title: str, description: str, initial_result: dict) -> dict:
-    """
-    Validate initial_result against RAG-retrieved similar cases.
-    If a mismatch is found, re-prompt the LLM with correction context.
-    Returns the final (possibly corrected) result dict with RAG metadata attached.
-    """
-    from apps.intelligence import rag  # deferred import avoids circular issues
-
-    # ── Step 1: retrieve similar past cases ───────────────────────────────
-    similar_cases = rag.retrieve_similar(title, description)
-
-    if not similar_cases:
-        logger.info('RAG: No similar cases found — skipping validation (cold start).')
-        initial_result.update({'rag_validated': False, 'rag_corrected': False,
-                               'rag_similar_count': 0})
-        return initial_result
-
-    # ── Step 2: validate LLM result vs retrieved distribution ─────────────
-    is_valid, correction_hints = rag.validate_result(initial_result, similar_cases)
-
-    if is_valid:
-        initial_result.update({
-            'rag_validated'     : True,
-            'rag_corrected'     : False,
-            'rag_similar_count' : len(similar_cases),
-            'rag_correction'    : {},
-        })
-        return initial_result
-
-    # ── Step 3: mismatch detected — build corrective prompt ───────────────
-    logger.warning(
-        f'RAG: Mismatch detected for "{title[:50]}". '
-        f'Hints: {correction_hints}. Starting correction round...'
-    )
-    correction_prompt = rag.build_correction_prompt(
-        title, description, initial_result, similar_cases, correction_hints
-    )
-
-    # ── Step 4: re-prompt best available LLM with context ─────────────────
-    corrected = _analyze_with_groq(title, description, custom_prompt=correction_prompt)
-    if not corrected:
-        corrected = _analyze_with_gemini(title, description, custom_prompt=correction_prompt)
-
-    if corrected:
-        # Log what changed
-        old_cat = initial_result.get('category')
-        old_pri = initial_result.get('priority')
-        new_cat = corrected.get('category')
-        new_pri = corrected.get('priority')
-        changed = []
-        if old_cat != new_cat: changed.append(f'category {old_cat}→{new_cat}')
-        if old_pri != new_pri: changed.append(f'priority {old_pri}→{new_pri}')
-
-        if changed:
-            logger.info(f'RAG CORRECTION APPLIED: {", ".join(changed)} (provider={corrected.get("ai_provider")})')
-        else:
-            logger.info('RAG correction round completed — LLM kept original assessment after reviewing context.')
-
-        corrected.update({
-            'rag_validated'     : True,
-            'rag_corrected'     : bool(changed),
-            'rag_similar_count' : len(similar_cases),
-            'rag_correction'    : correction_hints,
-            'rag_reasoning'     : corrected.get('rag_reasoning', ''),
-            'original_category' : old_cat,
-            'original_priority' : old_pri,
-        })
-        return corrected
-    else:
-        # All LLMs failed during correction — keep original but mark as unvalidated
-        logger.error(
-            'RAG: Correction round failed — no LLM available to re-analyze. '
-            'Keeping original result with rag_corrected=False.'
-        )
-        initial_result.update({
-            'rag_validated'     : False,
-            'rag_corrected'     : False,
-            'rag_similar_count' : len(similar_cases),
-            'rag_correction'    : correction_hints,
-        })
-        return initial_result
-
-
 # ── Public API ─────────────────────────────────────────────────────────────
 
 def categorize_complaint(title: str, description: str) -> dict:
     """
-    AI-powered complaint categorization with RAG validation.
+    AI-powered complaint categorization.
 
-    Full pipeline:
-      1. Groq llama-3.3-70b (key 1) → 2. Groq (key 2) → 3. Gemini → 4. Rule-based
-      5. RAG validation against similar past cases
-      6. If mismatch → re-prompt LLM with corrective context
+    Fallback chain:
+      1. Groq llama-3.3-70b (key 1)
+      2. Groq llama-3.3-70b (key 2)
+      3. Google Gemini
+      4. Rule-based keyword analysis
 
-    Returns dict with keys:
-        category, priority, summary, ai_provider,
-        rag_validated, rag_corrected, rag_similar_count,
-        rag_correction (hints dict), rag_reasoning (str)
+    Returns dict with keys: category, priority, summary, ai_provider
     """
     logger.info(f'Starting complaint analysis: title="{title[:60]}"')
 
-    # ── Initial LLM analysis ──────────────────────────────────────────────
     result = _analyze_with_groq(title, description)
     if not result:
         result = _analyze_with_gemini(title, description)
@@ -366,23 +272,8 @@ def categorize_complaint(title: str, description: str) -> dict:
         result = _rule_based_analyze(title, description)
 
     logger.info(
-        f'Initial analysis complete: cat={result["category"]}, '
+        f'Analysis complete: cat={result["category"]}, '
         f'pri={result["priority"]}, provider={result.get("ai_provider", "unknown")}'
-    )
-
-    # ── RAG validation + correction round ─────────────────────────────────
-    try:
-        result = _run_rag_validation(title, description, result)
-    except Exception as exc:
-        logger.error(f'RAG validation pipeline crashed (non-fatal): {exc}', exc_info=True)
-        result.setdefault('rag_validated', False)
-        result.setdefault('rag_corrected', False)
-        result.setdefault('rag_similar_count', 0)
-
-    logger.info(
-        f'Final result: cat={result["category"]}, pri={result["priority"]}, '
-        f'rag_validated={result.get("rag_validated")}, '
-        f'rag_corrected={result.get("rag_corrected")}'
     )
     return result
 

@@ -3,6 +3,7 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from django.db.models import Count, Avg
 
 from apps.complaints.models import Complaint
 from .engine import get_crime_hotspots, categorize_complaint, compute_severity
@@ -11,10 +12,59 @@ from .engine import get_crime_hotspots, categorize_complaint, compute_severity
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def hotspots(request):
-    """GET /api/intelligence/hotspots/ - Crime hotspot map data"""
+    """GET /api/intelligence/hotspots/ - Crime hotspot cluster data"""
     complaints = Complaint.objects.all()
     spots = get_crime_hotspots(complaints)
     return Response({'hotspots': spots})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def map_data(request):
+    """
+    GET /api/intelligence/map-data/
+    Returns individual complaint pins + hotspot clusters for the live map.
+    Authority/admin sees all; citizen sees only theirs.
+    """
+    user = request.user
+    base_qs = Complaint.objects.all() if user.role in ('authority', 'admin') else Complaint.objects.filter(reporter=user)
+
+    geo_qs = base_qs.filter(latitude__isnull=False, longitude__isnull=False)
+
+    pins = []
+    for c in geo_qs.values(
+        'complaint_id', 'title', 'category', 'priority',
+        'status', 'severity_score', 'latitude', 'longitude',
+        'incident_location', 'ai_summary', 'created_at'
+    ):
+        pins.append({
+            'complaint_id': c['complaint_id'],
+            'title': c['title'],
+            'category': c['category'],
+            'priority': c['priority'],
+            'status': c['status'],
+            'severity_score': c['severity_score'],
+            'lat': c['latitude'],
+            'lon': c['longitude'],
+            'location': c['incident_location'],
+            'ai_summary': c['ai_summary'] or '',
+            'created_at': c['created_at'].strftime('%d %b %Y') if c['created_at'] else '',
+        })
+
+    hotspot_clusters = get_crime_hotspots(base_qs)
+
+    # Category breakdown for map legend
+    category_counts = list(
+        base_qs.values('category').annotate(count=Count('id')).order_by('-count')[:6]
+    )
+
+    return Response({
+        'pins': pins,
+        'hotspots': hotspot_clusters,
+        'total_with_coords': len(pins),
+        'total_complaints': base_qs.count(),
+        'category_counts': category_counts,
+    })
 
 
 @api_view(['POST'])
@@ -38,6 +88,14 @@ def insights(request):
     pending_critical = Complaint.objects.filter(priority='critical', status__in=['pending', 'in_progress']).count()
     resolution_rate = round((resolved / total * 100), 1) if total > 0 else 0
 
+    top_category = (
+        Complaint.objects.values('category')
+        .annotate(count=Count('id'))
+        .order_by('-count')
+        .first()
+    )
+    top_cat_name = top_category['category'].replace('_', ' ').title() if top_category else 'N/A'
+
     return Response({
         'resolution_rate': resolution_rate,
         'pending_critical': pending_critical,
@@ -46,7 +104,7 @@ def insights(request):
         'insights': [
             f"{resolution_rate}% of all complaints have been resolved.",
             f"{pending_critical} critical complaints need immediate attention.",
-            "Peak reporting hours: 6PM - 10PM (based on data trends).",
-            "Top reported category this week: Theft & Robbery.",
+            f"Top reported category: {top_cat_name}.",
+            "Peak reporting hours: 6PM – 10PM (based on data trends).",
         ]
     })

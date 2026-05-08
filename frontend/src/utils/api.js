@@ -90,6 +90,7 @@ export const intelligenceAPI = {
   analyzeText: (title, description) =>
     api.post('/intelligence/analyze/', { title, description }),
   getHotspots: () => api.get('/intelligence/hotspots/'),
+  getMapData: () => api.get('/intelligence/map-data/'),
   getInsights: () => api.get('/intelligence/insights/'),
 };
 

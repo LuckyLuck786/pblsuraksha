@@ -94,8 +94,8 @@ html { scroll-behavior: smooth; }
 
 body {
   font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: #030712;
+  color: #e2e8f0;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
@@ -112,10 +112,10 @@ h1, h2, h3, h4, h5, h6 {
 a { color: inherit; text-decoration: none; }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--gray-400); }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #111827; }
+::-webkit-scrollbar-thumb { background: #374151; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #4b5563; }
 
 /* ── Layout ── */
 .app-layout {
@@ -677,15 +677,28 @@ tbody tr:hover { background: var(--gray-50); }
 
 /* ── Map Container ── */
 .map-container {
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: 1px solid #374151;
 }
 
 .leaflet-container {
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   font-family: 'DM Sans', sans-serif;
+  background: #e8eaed !important;
 }
+
+.leaflet-popup-content-wrapper {
+  background: #111827 !important;
+  border: 1px solid #374151 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5) !important;
+  color: #e2e8f0 !important;
+}
+
+.leaflet-popup-tip { background: #111827 !important; }
+.leaflet-popup-close-button { color: #9ca3af !important; }
+.leaflet-popup-close-button:hover { color: #f9fafb !important; }
 
 /* ── Upload Zone ── */
 .upload-zone {

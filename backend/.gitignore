@@ -1,0 +1,6 @@
+
+# RAG vector store (large binary files)
+rag_store/
+
+# Log files
+logs/*.log

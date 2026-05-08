@@ -58,6 +58,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'suraksha_project.middleware.RequestLoggingMiddleware',   # ← request logger
 ]
 
 ROOT_URLCONF = 'suraksha_project.urls'
@@ -160,18 +161,150 @@ GROQ_API_KEY_1 = _env('GROQ_API_KEY_1')
 GROQ_API_KEY_2 = _env('GROQ_API_KEY_2')
 GEMINI_API_KEY = _env('GEMINI_API_KEY')
 
+# ─── RAG Store ────────────────────────────────────────────────────────────
+RAG_STORE_PATH = BASE_DIR / 'rag_store'
+
 # ─── Logging ───────────────────────────────────────────────────────────────
+LOGS_DIR = BASE_DIR / 'logs'
+LOGS_DIR.mkdir(exist_ok=True)
+
 LOGGING = {
-    'version': 1,
+    'version'                 : 1,
     'disable_existing_loggers': False,
-    'handlers': {
-        'console': {'class': 'logging.StreamHandler'},
+
+    # ── Formatters ──────────────────────────────────────────────────────
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname:8s} {name} | {message}',
+            'style' : '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        'simple': {
+            'format': '{levelname:8s} {name} | {message}',
+            'style' : '{',
+        },
+        'request_fmt': {
+            'format': '[{asctime}] {levelname:8s} REQUEST | {message}',
+            'style' : '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
     },
+
+    # ── Handlers ────────────────────────────────────────────────────────
+    'handlers': {
+        # Console — always on, for dev visibility
+        'console': {
+            'class'    : 'logging.StreamHandler',
+            'formatter': 'simple',
+            'level'    : 'DEBUG',
+        },
+        # Rotating general log — INFO and above (max 10 MB × 5 backups)
+        'file_all': {
+            'class'       : 'logging.handlers.RotatingFileHandler',
+            'filename'    : str(LOGS_DIR / 'suraksha.log'),
+            'maxBytes'    : 10 * 1024 * 1024,
+            'backupCount' : 5,
+            'formatter'   : 'verbose',
+            'level'       : 'INFO',
+            'encoding'    : 'utf-8',
+        },
+        # Rotating error log — ERROR and above only
+        'file_errors': {
+            'class'       : 'logging.handlers.RotatingFileHandler',
+            'filename'    : str(LOGS_DIR / 'errors.log'),
+            'maxBytes'    : 5 * 1024 * 1024,
+            'backupCount' : 5,
+            'formatter'   : 'verbose',
+            'level'       : 'ERROR',
+            'encoding'    : 'utf-8',
+        },
+        # Dedicated AI/RAG log
+        'file_ai': {
+            'class'       : 'logging.handlers.RotatingFileHandler',
+            'filename'    : str(LOGS_DIR / 'ai_analysis.log'),
+            'maxBytes'    : 10 * 1024 * 1024,
+            'backupCount' : 3,
+            'formatter'   : 'verbose',
+            'level'       : 'DEBUG',
+            'encoding'    : 'utf-8',
+        },
+        # Dedicated request log
+        'file_requests': {
+            'class'       : 'logging.handlers.RotatingFileHandler',
+            'filename'    : str(LOGS_DIR / 'requests.log'),
+            'maxBytes'    : 20 * 1024 * 1024,
+            'backupCount' : 5,
+            'formatter'   : 'request_fmt',
+            'level'       : 'INFO',
+            'encoding'    : 'utf-8',
+        },
+    },
+
+    # ── Loggers ─────────────────────────────────────────────────────────
     'loggers': {
+        # AI engine (LLM calls, parsing, fallback)
+        'apps.intelligence.engine': {
+            'handlers'  : ['console', 'file_all', 'file_errors', 'file_ai'],
+            'level'     : 'DEBUG',
+            'propagate' : False,
+        },
+        # RAG validation layer
+        'apps.intelligence.rag': {
+            'handlers'  : ['console', 'file_all', 'file_errors', 'file_ai'],
+            'level'     : 'DEBUG',
+            'propagate' : False,
+        },
+        # Intelligence views
         'apps.intelligence': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': True,
+            'handlers'  : ['console', 'file_all', 'file_errors'],
+            'level'     : 'INFO',
+            'propagate' : False,
+        },
+        # Complaints app
+        'apps.complaints': {
+            'handlers'  : ['console', 'file_all', 'file_errors'],
+            'level'     : 'INFO',
+            'propagate' : False,
+        },
+        # RAG signal (auto-indexing)
+        'apps.complaints.signals': {
+            'handlers'  : ['console', 'file_all', 'file_errors', 'file_ai'],
+            'level'     : 'DEBUG',
+            'propagate' : False,
+        },
+        # Transport app
+        'apps.transport': {
+            'handlers'  : ['console', 'file_all', 'file_errors'],
+            'level'     : 'INFO',
+            'propagate' : False,
+        },
+        # Auth / accounts app
+        'apps.accounts': {
+            'handlers'  : ['console', 'file_all', 'file_errors'],
+            'level'     : 'INFO',
+            'propagate' : False,
+        },
+        # HTTP request logger (our middleware)
+        'suraksha.requests': {
+            'handlers'  : ['console', 'file_requests'],
+            'level'     : 'INFO',
+            'propagate' : False,
+        },
+        # Django internals — only warnings to avoid noise
+        'django': {
+            'handlers'  : ['console', 'file_errors'],
+            'level'     : 'WARNING',
+            'propagate' : False,
+        },
+        'django.request': {
+            'handlers'  : ['file_errors'],
+            'level'     : 'ERROR',
+            'propagate' : False,
+        },
+        # Root logger — catch anything not matched above
+        '': {
+            'handlers'  : ['console', 'file_all', 'file_errors'],
+            'level'     : 'WARNING',
         },
     },
 }

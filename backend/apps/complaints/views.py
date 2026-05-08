@@ -13,6 +13,8 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.utils import timezone
 from django.db.models import Count, Q
 
+import logging
+
 from .models import Complaint, ComplaintEvidence, ComplaintUpdate, Notification
 from .serializers import (
     ComplaintListSerializer, ComplaintDetailSerializer,
@@ -20,6 +22,8 @@ from .serializers import (
     ComplaintEvidenceSerializer, NotificationSerializer
 )
 from apps.intelligence.engine import categorize_complaint, compute_severity
+
+logger = logging.getLogger('apps.complaints')
 
 
 class ComplaintListCreateView(generics.ListCreateAPIView):
@@ -67,17 +71,26 @@ class ComplaintListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         user = self.request.user
         complaint_data = serializer.validated_data
+        title = complaint_data.get('title', '')
 
-        # ── Intelligence Layer: auto-categorize and compute severity ──
-        ai_result = categorize_complaint(
-            complaint_data.get('title', ''),
-            complaint_data.get('description', '')
-        )
-        severity = compute_severity(
-            complaint_data.get('title', ''),
-            complaint_data.get('description', ''),
-            ai_result.get('category', 'other')
-        )
+        logger.info(f'New complaint submission by {user.username}: "{title[:60]}"')
+
+        # ── Intelligence Layer: auto-categorize, RAG-validate, compute severity ──
+        try:
+            ai_result = categorize_complaint(title, complaint_data.get('description', ''))
+        except Exception as exc:
+            logger.error(f'AI categorization failed for "{title[:60]}": {exc}', exc_info=True)
+            ai_result = {
+                'category': 'other', 'priority': 'medium',
+                'summary': 'Auto-analysis unavailable.',
+                'rag_validated': False, 'rag_corrected': False,
+            }
+
+        try:
+            severity = compute_severity(title, complaint_data.get('description', ''), ai_result.get('category', 'other'))
+        except Exception as exc:
+            logger.error(f'Severity computation failed: {exc}', exc_info=True)
+            severity = 3.0
 
         complaint = serializer.save(
             reporter=user,
@@ -86,6 +99,15 @@ class ComplaintListCreateView(generics.ListCreateAPIView):
             ai_summary=ai_result.get('summary', ''),
             priority=ai_result.get('priority', 'medium'),
             severity_score=severity,
+            rag_validated=ai_result.get('rag_validated', False),
+            rag_corrected=ai_result.get('rag_corrected', False),
+        )
+
+        logger.info(
+            f'Complaint saved: {complaint.complaint_id} | '
+            f'cat={complaint.category} pri={complaint.priority} '
+            f'severity={severity} rag_validated={complaint.rag_validated} '
+            f'rag_corrected={complaint.rag_corrected} provider={ai_result.get("ai_provider", "?")}'
         )
 
         # Create initial update entry
@@ -145,11 +167,13 @@ def update_complaint_status(request, complaint_id):
     Authority updates the status of a complaint
     """
     if request.user.role not in ('authority', 'admin'):
+        logger.warning(f'update_complaint_status: unauthorised by {request.user.username} on {complaint_id}')
         return Response({'error': 'Permission denied.'}, status=403)
 
     try:
         complaint = Complaint.objects.get(complaint_id=complaint_id)
     except Complaint.DoesNotExist:
+        logger.warning(f'update_complaint_status: complaint {complaint_id} not found')
         return Response({'error': 'Complaint not found.'}, status=404)
 
     serializer = ComplaintUpdateActionSerializer(data=request.data)
@@ -178,6 +202,10 @@ def update_complaint_status(request, complaint_id):
         complaint.resolved_at = timezone.now()
 
     complaint.save()
+    logger.info(
+        f'Complaint {complaint_id} updated by {request.user.username}: '
+        f'status {old_status}→{complaint.status}, priority={complaint.priority}'
+    )
 
     # Create timeline update
     update = ComplaintUpdate.objects.create(

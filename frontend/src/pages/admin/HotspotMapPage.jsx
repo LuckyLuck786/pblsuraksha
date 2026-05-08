@@ -69,7 +69,7 @@ const HotspotMapPage = () => {
                         {hotspots.map((spot, index) => (
                             <CircleMarker
                                 key={index}
-                                center={[spot.lat, spot.lng]}
+                                center={[spot.lat, spot.lon]}
                                 radius={Math.max(10, (spot.incident_count || 1) * 2)}
                                 pathOptions={{ 
                                     color: getMarkerColor(spot.incident_count || 1),

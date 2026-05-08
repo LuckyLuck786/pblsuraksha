@@ -7,6 +7,22 @@ from pathlib import Path
 from datetime import timedelta
 import os
 
+def _env(key: str, default: str = '') -> str:
+    """Read from environment, then from .env file if present."""
+    val = os.environ.get(key, '')
+    if val:
+        return val
+    env_file = Path(__file__).resolve().parent.parent / '.env'
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if line.startswith('#') or '=' not in line:
+                continue
+            k, _, v = line.partition('=')
+            if k.strip() == key:
+                return v.strip().strip('"').strip("'")
+    return default
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'suraksha-secret-key-change-in-production-use-env-vars'
@@ -137,3 +153,25 @@ CORS_ALLOW_CREDENTIALS = True
 # ─── File Upload Settings ──────────────────────────────────────────────────
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800
+
+# ─── AI API Keys ───────────────────────────────────────────────────────────
+# Set these in backend/.env or as environment variables
+GROQ_API_KEY_1 = _env('GROQ_API_KEY_1')
+GROQ_API_KEY_2 = _env('GROQ_API_KEY_2')
+GEMINI_API_KEY = _env('GEMINI_API_KEY')
+
+# ─── Logging ───────────────────────────────────────────────────────────────
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler'},
+    },
+    'loggers': {
+        'apps.intelligence': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}

@@ -43,34 +43,39 @@ _CATEGORY_KEYWORDS = {
 }
 
 _HIGH_SEVERITY_KW = [
-    'murder', 'kill', 'dead', 'death', 'blood', 'gun', 'weapon', 'bomb',
-    'rape', 'sexual assault', 'kidnap', 'abduct', 'terrorist', 'explosion',
-    'stabbed', 'shot', 'unconscious', 'fire',
+    'murder', 'kill', 'killed', 'dead', 'death', 'blood', 'gun', 'weapon', 'bomb',
+    'rape', 'sexual assault', 'molestation', 'kidnap', 'abduct', 'terrorist', 'explosion',
+    'stabbed', 'stab', 'shot', 'shooting', 'unconscious', 'fire', 'burning',
+    'hostage', 'armed', 'acid attack', 'suicide',
 ]
 _MEDIUM_SEVERITY_KW = [
     'robbery', 'assault', 'attack', 'accident', 'injury', 'hurt', 'fraud',
-    'missing', 'threaten', 'harassment',
+    'missing', 'threaten', 'threat', 'harassment', 'snatch', 'steal', 'stolen',
+    'fight', 'chase', 'damage', 'broke', 'broken', 'hit', 'knocked',
+    'eve tease', 'stalking', 'loot', 'looted',
 ]
 
 _CATEGORY_SEVERITY_BASE = {
-    'assault'       : 7.0,
-    'missing_person': 8.0,
+    'missing_person': 8.5,
+    'assault'       : 7.5,
+    'harassment'    : 6.0,
     'drug_activity' : 6.0,
-    'theft'         : 5.0,
-    'harassment'    : 6.5,
-    'fraud'         : 5.5,
-    'cybercrime'    : 5.0,
     'domestic'      : 6.0,
+    'fraud'         : 5.5,
+    'theft'         : 5.5,
+    'cybercrime'    : 5.0,
     'traffic'       : 5.0,
-    'vandalism'     : 3.5,
-    'noise'         : 2.0,
-    'other'         : 3.0,
+    'vandalism'     : 4.0,
+    'other'         : 3.5,
+    'noise'         : 2.5,
 }
 
-# Priority always sets a floor and ceiling on the final severity score.
-# e.g. a "critical" complaint can NEVER score below 8.0, regardless of category.
-_PRIORITY_FLOOR = {'low': 0.0, 'medium': 3.0, 'high': 6.0, 'critical': 8.0}
-_PRIORITY_CAP   = {'low': 4.0, 'medium': 6.5, 'high': 8.5, 'critical': 10.0}
+# Representative midpoint score for each priority level (0-10 scale).
+# Final severity = 50% content-based score + 50% priority score — this way
+# the category always differentiates incidents within the same priority tier.
+_PRIORITY_SCORE = {'low': 2.0, 'medium': 4.5, 'high': 7.0, 'critical': 9.5}
+# Hard minimum only for critical — a bomb/murder can never score below 8.0
+_PRIORITY_MIN   = {'critical': 8.0}
 
 
 # ── AI Prompt Builder ──────────────────────────────────────────────────────
@@ -280,27 +285,41 @@ def categorize_complaint(title: str, description: str) -> dict:
 
 def compute_severity(title: str, description: str, category: str, priority: str = 'medium') -> float:
     """
-    Compute a 0–10 severity score for priority sorting.
-    Higher = more severe. Based on category base + critical keyword density,
-    then clamped to the floor/cap mandated by AI-determined priority so that
-    a 'critical' complaint can never score below 8.0 regardless of category.
+    Compute a 0–10 severity score.
+
+    Formula: final = 50% content_score + 50% priority_score
+    - content_score = category_base + keyword_boost (capped at 10)
+    - priority_score = fixed midpoint per priority tier
+    - Exception: critical complaints have a hard floor of 8.0
+
+    This blended approach means two incidents with the same AI priority can
+    still receive different scores based on their specific category and the
+    keywords found in the text (e.g. assault > theft within 'high' priority).
     """
     text = (title + ' ' + description).lower()
-    score = _CATEGORY_SEVERITY_BASE.get(category, 3.0)
 
-    high_hits = sum(1 for kw in _HIGH_SEVERITY_KW if kw in text)
-    score += min(high_hits * 0.5, 2.0)
+    # ── Content-based score ────────────────────────────────────────────────
+    base       = _CATEGORY_SEVERITY_BASE.get(category, 3.5)
+    high_hits  = sum(1 for kw in _HIGH_SEVERITY_KW  if kw in text)
+    med_hits   = sum(1 for kw in _MEDIUM_SEVERITY_KW if kw in text)
+    kw_boost   = min(high_hits * 1.0 + med_hits * 0.3, 2.5)
+    content    = min(base + kw_boost, 10.0)
 
-    # Enforce priority floor and cap
-    floor = _PRIORITY_FLOOR.get(priority, 0.0)
-    cap   = _PRIORITY_CAP.get(priority, 10.0)
-    final = round(min(max(score, floor), cap), 2)
+    # ── Priority-based score ───────────────────────────────────────────────
+    pri_score  = _PRIORITY_SCORE.get(priority, 4.5)
+
+    # ── Weighted blend ─────────────────────────────────────────────────────
+    blended    = (content * 0.5) + (pri_score * 0.5)
+
+    # ── Hard minimum for critical only ─────────────────────────────────────
+    minimum    = _PRIORITY_MIN.get(priority, 0.0)
+    final      = round(min(max(blended, minimum), 10.0), 2)
 
     logger.debug(
-        f'Severity computed: {final} '
-        f'(category={category}, priority={priority}, '
-        f'base_score={_CATEGORY_SEVERITY_BASE.get(category, 3.0)}, '
-        f'high_keyword_hits={high_hits}, floor={floor}, cap={cap})'
+        f'Severity: {final} '
+        f'(cat={category}, base={base}, kw_boost={kw_boost:.1f} '
+        f'[high×{high_hits} med×{med_hits}], '
+        f'content={content:.1f}, pri={priority}/{pri_score}, blended={blended:.2f})'
     )
     return final
 

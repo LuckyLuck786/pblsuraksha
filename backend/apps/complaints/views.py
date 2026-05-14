@@ -96,6 +96,18 @@ class ComplaintListCreateView(generics.ListCreateAPIView):
             logger.error(f'Severity computation failed: {exc}', exc_info=True)
             severity = 3.0
 
+        # ── Auto-geocode the incident location ──────────────────────────────
+        # Try the full address first, fall back to the short location name.
+        # Failure is non-fatal — complaint is still saved without coordinates.
+        lat, lon = None, None
+        try:
+            from .utils import geocode_location
+            primary  = complaint_data.get('incident_address', '').strip()
+            fallback = complaint_data.get('incident_location', '').strip()
+            lat, lon = geocode_location(primary or fallback, fallback if primary else '')
+        except Exception as exc:
+            logger.warning(f'Geocoding step failed (non-fatal): {exc}')
+
         complaint = serializer.save(
             reporter=user,
             ai_category=ai_result.get('category', ''),
@@ -103,12 +115,15 @@ class ComplaintListCreateView(generics.ListCreateAPIView):
             ai_summary=ai_result.get('summary', ''),
             priority=ai_result.get('priority', 'medium'),
             severity_score=severity,
+            latitude=lat,
+            longitude=lon,
         )
 
         logger.info(
             f'Complaint saved: {complaint.complaint_id} | '
             f'cat={complaint.category} pri={complaint.priority} '
-            f'severity={severity} provider={ai_result.get("ai_provider", "?")}'
+            f'severity={severity} coords=({lat}, {lon}) '
+            f'provider={ai_result.get("ai_provider", "?")}'
         )
 
         # Create initial update entry

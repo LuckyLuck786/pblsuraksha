@@ -139,10 +139,12 @@ export const transportAPI = {
 
 // ── Intelligence APIs ──────────────────────────────────────────────────────
 export const intelligenceAPI = {
-  analyzeText : (title, description) => api.post('/intelligence/analyze/', { title, description }),
-  getHotspots : ()                   => api.get('/intelligence/hotspots/'),
-  getMapData  : ()                   => api.get('/intelligence/map-data/'),
-  getInsights : ()                   => api.get('/intelligence/insights/'),
+  analyzeText    : (title, description) => api.post('/intelligence/analyze/', { title, description }),
+  getHotspots    : ()                   => api.get('/intelligence/hotspots/'),
+  getMapData     : ()                   => api.get('/intelligence/map-data/'),
+  getInsights    : ()                   => api.get('/intelligence/insights/'),
+  analyzeAll     : (title, description) => api.post('/intelligence/analyze-all/', { title, description }),
+  getLLMAnalytics: (sample = 20)        => api.get(`/intelligence/llm-analytics/?sample=${sample}`),
 };
 
 export default api;

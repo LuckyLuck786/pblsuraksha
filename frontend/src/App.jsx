@@ -19,6 +19,7 @@ import HotspotMapPage from './pages/admin/HotspotMapPage';
 import AdminComplaintsPage from './pages/admin/AdminComplaintsPage';
 import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
+import LLMAnalyticsPage from './pages/admin/LLMAnalyticsPage';
 
 // Transport / Farmer Pages
 import TransportDashboardPage from './pages/transport/TransportDashboardPage';
@@ -118,6 +119,9 @@ function App() {
                         } />
                         <Route path="admin/users" element={
                             <ProtectedRoute allowedRoles={['admin', 'authority']}><AdminUsersPage /></ProtectedRoute>
+                        } />
+                        <Route path="admin/llm-analytics" element={
+                            <ProtectedRoute allowedRoles={['admin', 'authority']}><LLMAnalyticsPage /></ProtectedRoute>
                         } />
 
                         {/* ── Farmer / Transport ─────────────────────── */}

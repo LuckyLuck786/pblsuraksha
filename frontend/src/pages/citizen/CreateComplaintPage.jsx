@@ -5,10 +5,98 @@ import { complaintsAPI, intelligenceAPI } from '../../utils/api';
 
 const PRIORITY_COLORS = {
     critical: 'bg-red-100 text-red-800 border-red-300',
-    high: 'bg-orange-100 text-orange-800 border-orange-300',
-    medium: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-    low: 'bg-green-100 text-green-800 border-green-300',
+    high    : 'bg-orange-100 text-orange-800 border-orange-300',
+    medium  : 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    low     : 'bg-green-100 text-green-800 border-green-300',
 };
+
+const PROVIDER_COLORS = {
+    'groq-key-1' : { bg: 'bg-violet-50',  border: 'border-violet-200', badge: 'bg-violet-100 text-violet-800', dot: 'bg-violet-500' },
+    'groq-key-2' : { bg: 'bg-indigo-50',  border: 'border-indigo-200', badge: 'bg-indigo-100 text-indigo-800', dot: 'bg-indigo-500' },
+    'gemini'     : { bg: 'bg-blue-50',    border: 'border-blue-200',   badge: 'bg-blue-100 text-blue-800',     dot: 'bg-blue-500'   },
+    'rule-based' : { bg: 'bg-gray-50',    border: 'border-gray-200',   badge: 'bg-gray-100 text-gray-700',     dot: 'bg-gray-400'   },
+};
+
+function AgreementBanner({ results }) {
+    const successful = results.filter(r => r.success);
+    if (successful.length < 2) return null;
+    const categories = successful.map(r => r.category);
+    const priorities = successful.map(r => r.priority);
+    const catAgree = categories.every(c => c === categories[0]);
+    const priAgree = priorities.every(p => p === priorities[0]);
+    if (catAgree && priAgree) {
+        return (
+            <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700 font-medium">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                All models agree — Category: <strong>{categories[0]}</strong>, Priority: <strong>{priorities[0]?.toUpperCase()}</strong>
+            </div>
+        );
+    }
+    if (!catAgree && !priAgree) {
+        return (
+            <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 font-medium">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                Models disagree on both category and priority — review carefully
+            </div>
+        );
+    }
+    return (
+        <div className="flex items-center gap-2 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-700 font-medium">
+            <span className="w-2 h-2 rounded-full bg-yellow-500" />
+            Partial agreement — {catAgree ? 'category matches' : 'categories differ'}, {priAgree ? 'priority matches' : 'priorities differ'}
+        </div>
+    );
+}
+
+function ProviderCard({ result }) {
+    const cfg = PROVIDER_COLORS[result.provider_key] || PROVIDER_COLORS['rule-based'];
+    return (
+        <div className={`rounded-xl border ${cfg.border} ${cfg.bg} p-4 flex flex-col gap-3`}>
+            {/* Header */}
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full ${cfg.dot}`} />
+                    <span className="text-xs font-bold text-gray-700 leading-tight">{result.provider_label}</span>
+                </div>
+                <span className="text-xs text-gray-400 tabular-nums">{result.latency_ms}ms</span>
+            </div>
+
+            {result.success ? (
+                <>
+                    {/* Category + Priority + Severity */}
+                    <div className="grid grid-cols-3 gap-2">
+                        <div className="bg-white/80 rounded-lg p-2 text-center">
+                            <p className="text-xs text-gray-400 mb-0.5">Category</p>
+                            <p className="text-xs font-bold text-gray-800 capitalize leading-tight">{result.category?.replace('_', ' ')}</p>
+                        </div>
+                        <div className="bg-white/80 rounded-lg p-2 text-center">
+                            <p className="text-xs text-gray-400 mb-0.5">Priority</p>
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full border ${PRIORITY_COLORS[result.priority] || 'bg-gray-100 text-gray-700'}`}>
+                                {result.priority?.toUpperCase()}
+                            </span>
+                        </div>
+                        <div className="bg-white/80 rounded-lg p-2 text-center">
+                            <p className="text-xs text-gray-400 mb-0.5">Severity</p>
+                            <p className="text-xs font-bold text-gray-800">{result.severity_score}/10</p>
+                        </div>
+                    </div>
+
+                    {/* Summary */}
+                    {result.summary && (
+                        <p className="text-xs text-gray-600 italic leading-relaxed">{result.summary}</p>
+                    )}
+                </>
+            ) : (
+                <div className="flex items-center gap-2 text-xs text-red-500">
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Provider unavailable</span>
+                </div>
+            )}
+        </div>
+    );
+}
 
 const CreateComplaintPage = () => {
     const navigate = useNavigate();
@@ -19,7 +107,7 @@ const CreateComplaintPage = () => {
         incident_address: '',
         is_anonymous: false,
     });
-    const [aiAnalysis, setAiAnalysis] = useState(null);
+    const [allAnalyses, setAllAnalyses] = useState(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errors, setErrors] = useState({});
@@ -36,11 +124,12 @@ const CreateComplaintPage = () => {
             return;
         }
         setIsAnalyzing(true);
-        setAiAnalysis(null);
+        setAllAnalyses(null);
         try {
-            const res = await intelligenceAPI.analyzeText(formData.title, formData.description);
-            setAiAnalysis(res.data);
-            toast.success('AI analysis complete!');
+            const res = await intelligenceAPI.analyzeAll(formData.title, formData.description);
+            setAllAnalyses(res.data.results);
+            const successCount = res.data.results.filter(r => r.success).length;
+            toast.success(`Analysis complete — ${successCount}/4 models responded`);
         } catch (error) {
             toast.error('AI analysis failed. You can still submit the complaint.');
         } finally {
@@ -84,7 +173,7 @@ const CreateComplaintPage = () => {
                 <div className="bg-indigo-600 px-6 py-4">
                     <h2 className="text-2xl font-bold text-white">File a New Complaint</h2>
                     <p className="text-indigo-200 text-sm mt-1">
-                        Your report is powered by AI — we'll analyze severity automatically.
+                        Your report is powered by AI — all 3 models analyze severity simultaneously.
                     </p>
                 </div>
 
@@ -120,7 +209,7 @@ const CreateComplaintPage = () => {
                         {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
                     </div>
 
-                    {/* AI Analyze Button */}
+                    {/* Analyze button */}
                     <div className="flex items-center gap-3">
                         <button
                             type="button"
@@ -134,43 +223,28 @@ const CreateComplaintPage = () => {
                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
                                     </svg>
-                                    Analyzing with AI...
+                                    Analyzing with all models...
                                 </>
                             ) : (
-                                <>⚡ Analyze with AI</>
+                                <>⚡ Analyze with All Models</>
                             )}
                         </button>
-                        <span className="text-xs text-gray-400">Powered by Groq + Gemini</span>
+                        <span className="text-xs text-gray-400">Groq (×2) + Gemini + Rule-based in parallel</span>
                     </div>
 
-                    {/* AI Analysis Result */}
-                    {aiAnalysis && (
-                        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-                            <h4 className="text-sm font-bold text-indigo-800 mb-3 flex items-center gap-2">
-                                🤖 AI Intelligence Report
-                                {aiAnalysis.ai_provider && (
-                                    <span className="text-xs font-normal text-indigo-500">via {aiAnalysis.ai_provider}</span>
-                                )}
-                            </h4>
-                            <div className="grid grid-cols-3 gap-3 mb-3">
-                                <div className="bg-white rounded-md p-2 text-center border border-indigo-100">
-                                    <p className="text-xs text-gray-500">Category</p>
-                                    <p className="text-sm font-bold text-gray-800 capitalize">{aiAnalysis.category?.replace('_', ' ')}</p>
-                                </div>
-                                <div className="bg-white rounded-md p-2 text-center border border-indigo-100">
-                                    <p className="text-xs text-gray-500">Priority</p>
-                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${PRIORITY_COLORS[aiAnalysis.priority] || 'bg-gray-100 text-gray-700'}`}>
-                                        {aiAnalysis.priority?.toUpperCase()}
-                                    </span>
-                                </div>
-                                <div className="bg-white rounded-md p-2 text-center border border-indigo-100">
-                                    <p className="text-xs text-gray-500">Severity</p>
-                                    <p className="text-sm font-bold text-gray-800">{aiAnalysis.severity_score}/10</p>
-                                </div>
+                    {/* All Models Results */}
+                    {allAnalyses && (
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-bold text-gray-700">🤖 AI Intelligence Report — All Models</h4>
+                                <span className="text-xs text-gray-400">{allAnalyses.filter(r => r.success).length}/4 responded</span>
                             </div>
-                            {aiAnalysis.summary && (
-                                <p className="text-xs text-indigo-700 italic">{aiAnalysis.summary}</p>
-                            )}
+                            <AgreementBanner results={allAnalyses} />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {allAnalyses.map((result) => (
+                                    <ProviderCard key={result.provider_key} result={result} />
+                                ))}
+                            </div>
                         </div>
                     )}
 
@@ -201,7 +275,7 @@ const CreateComplaintPage = () => {
                         />
                     </div>
 
-                    {/* Anonymous option */}
+                    {/* Anonymous */}
                     <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <input
                             type="checkbox"

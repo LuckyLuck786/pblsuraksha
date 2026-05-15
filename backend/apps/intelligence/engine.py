@@ -13,7 +13,9 @@ Fallback chain:
 import re
 import json
 import math
+import time
 import logging
+import concurrent.futures
 from datetime import datetime
 from django.conf import settings
 
@@ -251,6 +253,116 @@ def _rule_based_analyze(title: str, description: str) -> dict:
         'summary'    : f"System Analysis: [{priority.upper()}] Classified as {detected_category.replace('_', ' ')}. Routed for review.",
         'ai_provider': 'rule-based-fallback',
     }
+
+
+def _analyze_with_groq_key(title: str, description: str, key_index: int = 0) -> dict | None:
+    """Try exactly ONE Groq key by index (0=Key1, 1=Key2). No fallback."""
+    try:
+        from groq import Groq
+    except ImportError:
+        return None
+
+    keys = [k for k in [
+        getattr(settings, 'GROQ_API_KEY_1', ''),
+        getattr(settings, 'GROQ_API_KEY_2', ''),
+    ] if k]
+
+    if key_index >= len(keys):
+        logger.warning(f'Groq key {key_index + 1} not configured.')
+        return None
+
+    key_label = key_index + 1
+    prompt = _build_prompt(title, description)
+
+    try:
+        client   = Groq(api_key=keys[key_index])
+        response = client.chat.completions.create(
+            model='llama-3.3-70b-versatile',
+            messages=[{'role': 'user', 'content': prompt}],
+            temperature=0.1,
+            max_tokens=400,
+        )
+        result = _parse_ai_json(response.choices[0].message.content)
+        if result:
+            result['ai_provider']   = f'groq-key-{key_label}'
+            result['provider_label'] = f'Groq Llama-3.3-70b (Key {key_label})'
+            logger.info(f'Groq key {key_label} (single): cat={result["category"]}, pri={result["priority"]}')
+            return result
+        logger.warning(f'Groq key {key_label}: could not parse JSON response.')
+    except Exception as exc:
+        logger.warning(f'Groq key {key_label} failed: {type(exc).__name__}: {exc}')
+
+    return None
+
+
+def analyze_all_llms(title: str, description: str) -> list:
+    """
+    Call all LLM providers and rule-based engine IN PARALLEL.
+    Returns a list of 4 result dicts (one per provider), always in the
+    order: [groq-key-1, groq-key-2, gemini, rule-based].
+
+    Each dict always contains:
+        provider_key    – stable identifier for matching
+        provider_label  – human-readable name
+        success         – bool
+        latency_ms      – float
+        category        – str | None
+        priority        – str | None
+        summary         – str | None
+        severity_score  – float | None
+        error           – str (only when success=False)
+    """
+    def _timed(fn, provider_key, display_label):
+        t0 = time.perf_counter()
+        raw = None
+        err = None
+        try:
+            raw = fn()
+        except Exception as exc:
+            err = str(exc)
+            logger.warning(f'{provider_key} parallel call error: {exc}')
+
+        latency_ms = round((time.perf_counter() - t0) * 1000, 1)
+
+        if raw:
+            raw['provider_key']   = provider_key
+            raw['provider_label'] = display_label
+            raw['latency_ms']     = latency_ms
+            raw['success']        = True
+            raw['severity_score'] = compute_severity(
+                title, description,
+                raw.get('category', 'other'),
+                raw.get('priority', 'medium'),
+            )
+            return raw
+
+        return {
+            'provider_key'  : provider_key,
+            'provider_label': display_label,
+            'ai_provider'   : provider_key,
+            'success'       : False,
+            'latency_ms'    : latency_ms,
+            'error'         : err or 'Provider unavailable or returned invalid response',
+            'category'      : None,
+            'priority'      : None,
+            'summary'       : None,
+            'severity_score': None,
+        }
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        f1 = ex.submit(_timed, lambda: _analyze_with_groq_key(title, description, 0),
+                       'groq-key-1', 'Groq Llama-3.3-70b (Key 1)')
+        f2 = ex.submit(_timed, lambda: _analyze_with_groq_key(title, description, 1),
+                       'groq-key-2', 'Groq Llama-3.3-70b (Key 2)')
+        f3 = ex.submit(_timed, lambda: _analyze_with_gemini(title, description),
+                       'gemini',     'Google Gemini 2.0-Flash')
+        f4 = ex.submit(_timed, lambda: _rule_based_analyze(title, description),
+                       'rule-based', 'Rule-Based NLP')
+        results = [f1.result(), f2.result(), f3.result(), f4.result()]
+
+    successes = sum(1 for r in results if r['success'])
+    logger.info(f'analyze_all_llms: {successes}/4 providers succeeded for "{title[:50]}"')
+    return results
 
 
 # ── Public API ─────────────────────────────────────────────────────────────

@@ -169,7 +169,6 @@ class Notification(models.Model):
     NOTIF_TYPE_CHOICES = [
         ('complaint_update', 'Complaint Update'),
         ('new_assignment', 'New Assignment'),
-        ('transport_update', 'Transport Update'),
         ('system', 'System Notification'),
     ]
 

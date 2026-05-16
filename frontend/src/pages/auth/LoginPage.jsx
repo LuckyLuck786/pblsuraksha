@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 const FEATURES = [
   { icon: '🛡️', title: 'AI-Powered Analysis', desc: 'Smart priority classification using LLM models' },
   { icon: '🗺️', title: 'Live Crime Hotspots', desc: 'Real-time incident mapping across your city' },
-  { icon: '🚜', title: 'Farmer Logistics', desc: 'AI-routed transport for agricultural produce' },
+  { icon: '📊', title: 'Analytics Dashboard', desc: 'Deep insights into crime patterns and trends' },
   { icon: '🔔', title: 'Instant Alerts', desc: 'Real-time notifications on case updates' },
 ];
 
@@ -31,7 +31,6 @@ const LoginPage = () => {
       toast.success(`Welcome back, ${data?.user?.first_name || form.username}!`);
       const role = data?.user?.role;
       if (role === 'admin' || role === 'authority') navigate('/admin/dashboard');
-      else if (role === 'farmer') navigate('/transport/dashboard');
       else navigate('/dashboard');
     } catch {
       toast.error('Invalid username or password');
@@ -78,7 +77,7 @@ const LoginPage = () => {
             <span className="text-indigo-300">With Intelligence</span>
           </h2>
           <p className="text-indigo-200 text-lg mb-12 leading-relaxed">
-            AI-powered public safety management platform connecting citizens, authorities, and farmers across Karnataka.
+            AI-powered public safety management platform connecting citizens and authorities across Karnataka.
           </p>
 
           <div className="grid grid-cols-1 gap-4">
@@ -200,7 +199,7 @@ const LoginPage = () => {
           <div className="mt-8 p-4 bg-gray-800/50 border border-gray-700/50 rounded-xl">
             <p className="text-xs text-gray-500 font-medium mb-2">Available roles on this platform:</p>
             <div className="flex flex-wrap gap-2">
-              {['Citizen', 'Police Authority', 'Admin', 'Farmer'].map(r => (
+              {['Citizen', 'Police Authority', 'Admin'].map(r => (
                 <span key={r} className="text-xs px-2 py-1 bg-gray-700/80 text-gray-400 rounded-md">{r}</span>
               ))}
             </div>

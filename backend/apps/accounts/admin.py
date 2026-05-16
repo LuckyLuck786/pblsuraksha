@@ -11,6 +11,6 @@ class UserAdmin(BaseUserAdmin):
         ('SURAKSHA Profile', {
             'fields': ('role', 'phone', 'address', 'city', 'state', 'pincode',
                        'avatar', 'is_verified', 'latitude', 'longitude',
-                       'badge_number', 'station_name', 'farm_location', 'farm_size_acres')
+                       'badge_number', 'station_name')
         }),
     )

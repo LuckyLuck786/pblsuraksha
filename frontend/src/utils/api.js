@@ -127,16 +127,6 @@ export const complaintsAPI = {
   markNotificationsRead: ()    => api.post('/complaints/data/notifications/read/'),
 };
 
-// ── Transport APIs ─────────────────────────────────────────────────────────
-export const transportAPI = {
-  getAll            : ()                              => api.get('/transport/'),
-  create            : (data)                          => api.post('/transport/', data),
-  confirm           : (requestId)                     => api.post(`/transport/${requestId}/confirm/`),
-  getNearbyFacilities: (lat, lon, type = '', radius = 100) =>
-    api.get('/transport/facilities/', { params: { lat, lon, type, radius } }),
-  getAllFacilities   : () => api.get('/transport/facilities/all/'),
-};
-
 // ── Intelligence APIs ──────────────────────────────────────────────────────
 export const intelligenceAPI = {
   analyzeText    : (title, description) => api.post('/intelligence/analyze/', { title, description }),
@@ -144,7 +134,7 @@ export const intelligenceAPI = {
   getMapData     : ()                   => api.get('/intelligence/map-data/'),
   getInsights    : ()                   => api.get('/intelligence/insights/'),
   analyzeAll     : (title, description) => api.post('/intelligence/analyze-all/', { title, description }),
-  getLLMAnalytics: (sample = 20)        => api.get(`/intelligence/llm-analytics/?sample=${sample}`),
+  getLLMAnalytics: (sample = 20)        => api.get(`/intelligence/llm-analytics/?sample=${sample}`, { timeout: 300000 }), // 5-min timeout for bulk eval
 };
 
 export default api;

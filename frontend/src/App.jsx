@@ -21,12 +21,6 @@ import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import LLMAnalyticsPage from './pages/admin/LLMAnalyticsPage';
 
-// Transport / Farmer Pages
-import TransportDashboardPage from './pages/transport/TransportDashboardPage';
-import CreateRequestPage from './pages/transport/CreateRequestPage';
-import FacilitiesPage from './pages/transport/FacilitiesPage';
-import ActiveRoutesPage from './pages/transport/ActiveRoutesPage';
-
 // Profile
 import ProfilePage from './pages/profile/ProfilePage';
 
@@ -44,7 +38,6 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     if (!user) return <Navigate to="/login" replace />;
     if (allowedRoles && !allowedRoles.includes(user.role)) {
         // Redirect to appropriate default for their role
-        if (user.role === 'farmer') return <Navigate to="/transport/dashboard" replace />;
         if (user.role === 'citizen') return <Navigate to="/dashboard" replace />;
         return <Navigate to="/admin/dashboard" replace />;
     }
@@ -55,7 +48,6 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 const RoleRedirect = () => {
     const { user } = useAuth();
     if (!user) return <Navigate to="/login" replace />;
-    if (user.role === 'farmer') return <Navigate to="/transport/dashboard" replace />;
     if (user.role === 'admin' || user.role === 'authority') return <Navigate to="/admin/dashboard" replace />;
     return <Navigate to="/dashboard" replace />;
 };
@@ -122,23 +114,6 @@ function App() {
                         } />
                         <Route path="admin/llm-analytics" element={
                             <ProtectedRoute allowedRoles={['admin', 'authority']}><LLMAnalyticsPage /></ProtectedRoute>
-                        } />
-
-                        {/* ── Farmer / Transport ─────────────────────── */}
-                        <Route path="transport/dashboard" element={
-                            <ProtectedRoute allowedRoles={['farmer']}><TransportDashboardPage /></ProtectedRoute>
-                        } />
-                        <Route path="transport/new" element={
-                            <ProtectedRoute allowedRoles={['farmer']}><CreateRequestPage /></ProtectedRoute>
-                        } />
-                        <Route path="transport/requests" element={
-                            <ProtectedRoute allowedRoles={['farmer']}><TransportDashboardPage /></ProtectedRoute>
-                        } />
-                        <Route path="transport/facilities" element={
-                            <ProtectedRoute allowedRoles={['farmer']}><FacilitiesPage /></ProtectedRoute>
-                        } />
-                        <Route path="transport/active" element={
-                            <ProtectedRoute allowedRoles={['farmer']}><ActiveRoutesPage /></ProtectedRoute>
                         } />
 
                         {/* Catch-all */}

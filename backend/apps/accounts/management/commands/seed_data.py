@@ -5,8 +5,6 @@ Run: python manage.py seed_data
 
 import random
 from django.core.management.base import BaseCommand
-from django.utils import timezone
-from datetime import timedelta
 
 
 class Command(BaseCommand):
@@ -15,7 +13,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         from apps.accounts.models import User
         from apps.complaints.models import Complaint, ComplaintUpdate, Notification
-        from apps.transport.models import StorageFacility, TransportRequest
 
         self.stdout.write('🌱 Seeding SURAKSHA demo data...')
 
@@ -58,74 +55,7 @@ class Command(BaseCommand):
         citizen1.set_password('citizen123')
         citizen1.save()
 
-        farmer1, _ = User.objects.get_or_create(
-            username='ramesh_farmer',
-            defaults={
-                'email': 'ramesh@farmer.com',
-                'first_name': 'Ramesh', 'last_name': 'Gowda',
-                'role': 'farmer', 'city': 'Tumkur',
-                'farm_location': 'Tumkur, Karnataka',
-                'farm_size_acres': 5.5, 'is_verified': True,
-            }
-        )
-        farmer1.set_password('farmer123')
-        farmer1.save()
-
         self.stdout.write('  ✅ Users created')
-
-        # ── Storage Facilities ────────────────────────────────────────────
-        facilities_data = [
-            {
-                'name': 'APMC Yeshwanthpur Market',
-                'facility_type': 'market',
-                'address': 'Yeshwanthpur, Bengaluru',
-                'city': 'Bengaluru', 'latitude': 13.0244, 'longitude': 77.5538,
-                'capacity_tons': 500, 'available_capacity_tons': 320,
-                'contact_phone': '080-23377722', 'price_per_ton': 250,
-                'accepted_crops': 'vegetables,fruits,grains',
-            },
-            {
-                'name': 'Karnataka Cold Storage - Tumkur',
-                'facility_type': 'cold_storage',
-                'address': 'Industrial Area, Tumkur',
-                'city': 'Tumkur', 'latitude': 13.3399, 'longitude': 77.1006,
-                'capacity_tons': 1000, 'available_capacity_tons': 600,
-                'contact_phone': '0816-2276543', 'price_per_ton': 400,
-                'accepted_crops': 'vegetables,fruits,dairy',
-            },
-            {
-                'name': 'Kolar Distribution Hub',
-                'facility_type': 'distribution',
-                'address': 'NH 75, Kolar',
-                'city': 'Kolar', 'latitude': 13.1360, 'longitude': 78.1294,
-                'capacity_tons': 750, 'available_capacity_tons': 450,
-                'contact_phone': '08152-222345', 'price_per_ton': 200,
-                'accepted_crops': 'all',
-            },
-            {
-                'name': 'Hassan Agri Warehouse',
-                'facility_type': 'warehouse',
-                'address': 'Bypass Road, Hassan',
-                'city': 'Hassan', 'latitude': 13.0043, 'longitude': 76.1003,
-                'capacity_tons': 2000, 'available_capacity_tons': 1200,
-                'contact_phone': '08172-268432', 'price_per_ton': 150,
-                'accepted_crops': 'grains,pulses,spices',
-            },
-            {
-                'name': 'Mysuru Processing Unit',
-                'facility_type': 'processing',
-                'address': 'Hebbal Industrial Area, Mysuru',
-                'city': 'Mysuru', 'latitude': 12.2958, 'longitude': 76.6394,
-                'capacity_tons': 400, 'available_capacity_tons': 180,
-                'contact_phone': '0821-2345678', 'price_per_ton': 350,
-                'accepted_crops': 'fruits,vegetables,spices',
-            },
-        ]
-
-        for fd in facilities_data:
-            StorageFacility.objects.get_or_create(name=fd['name'], defaults=fd)
-
-        self.stdout.write('  ✅ Storage facilities created')
 
         # ── Sample Complaints ─────────────────────────────────────────────
         complaints_data = [
@@ -199,30 +129,6 @@ class Command(BaseCommand):
                     )
 
         self.stdout.write('  ✅ Sample complaints created')
-
-        # ── Sample Transport Request ───────────────────────────────────────
-        facility = StorageFacility.objects.first()
-        if facility:
-            TransportRequest.objects.get_or_create(
-                farmer=farmer1,
-                crop_name='Tomatoes',
-                defaults={
-                    'crop_type': 'vegetables',
-                    'quantity_tons': 2.5,
-                    'is_perishable': True,
-                    'requires_cold_storage': False,
-                    'pickup_address': 'Survey No. 45, Tumkur Main Road, Tumkur',
-                    'pickup_latitude': 13.3399,
-                    'pickup_longitude': 77.1006,
-                    'pickup_date': timezone.now() + timedelta(hours=12),
-                    'destination': facility,
-                    'status': 'confirmed',
-                    'estimated_distance_km': 72.4,
-                    'estimated_duration_hours': 1.8,
-                }
-            )
-
-        self.stdout.write('  ✅ Transport request created')
         self.stdout.write('')
         self.stdout.write(self.style.SUCCESS('🎉 SURAKSHA demo data seeded successfully!'))
         self.stdout.write('')
@@ -230,4 +136,3 @@ class Command(BaseCommand):
         self.stdout.write('  Admin:    admin / admin123')
         self.stdout.write('  Officer:  officer_ravi / officer123')
         self.stdout.write('  Citizen:  priya_sharma / citizen123')
-        self.stdout.write('  Farmer:   ramesh_farmer / farmer123')

@@ -15,11 +15,50 @@ import json
 import math
 import time
 import logging
+import threading
 import concurrent.futures
 from datetime import datetime
 from django.conf import settings
 
 logger = logging.getLogger('apps.intelligence.engine')
+
+
+# ── Groq Rate Limiter ──────────────────────────────────────────────────────
+# Groq free tier: 30 RPM shared across ALL keys in the same org.
+# This token-bucket limiter caps outgoing Groq calls to 28/min (2 safety margin)
+# so parallel evaluations don't burn through the RPM quota all at once.
+
+class _GroqRateLimiter:
+    """Thread-safe sliding-window rate limiter — max 28 Groq calls per 60 s."""
+    _max  = 28
+    _win  = 60.0
+    _lock = threading.Lock()
+    _log: list[float] = []
+
+    @classmethod
+    def wait(cls) -> None:
+        """
+        Block the calling thread until there is room in the 60-s window.
+        The lock is released before sleeping so other threads are not stalled.
+        """
+        while True:
+            sleep_for = 0.0
+            with cls._lock:
+                now       = time.monotonic()
+                cls._log  = [t for t in cls._log if now - t < cls._win]
+                if len(cls._log) < cls._max:
+                    cls._log.append(time.monotonic())
+                    return          # slot acquired — caller may proceed
+                # Window full — compute wait time, then release the lock
+                sleep_for = cls._log[0] + cls._win - now
+
+            # Sleep outside the lock so other threads can keep checking
+            if sleep_for > 0:
+                logger.debug(
+                    f'Groq RPM cap: window full ({cls._max}/min) — '
+                    f'sleeping {sleep_for:.1f}s'
+                )
+                time.sleep(sleep_for)
 
 # ── Constants ──────────────────────────────────────────────────────────────
 
@@ -83,27 +122,50 @@ _PRIORITY_MIN   = {'critical': 8.0}
 # ── AI Prompt Builder ──────────────────────────────────────────────────────
 
 def _build_prompt(title: str, description: str) -> str:
-    return f"""You are an AI assistant for SURAKSHA, India's intelligent public safety platform.
+    return f"""You are SURAKSHA's AI crime classification engine for India's public safety platform (NCRB taxonomy).
 
-Analyze the complaint and respond with ONLY a valid JSON object (no markdown, no explanation).
+TASK: Classify the complaint below into EXACTLY ONE of 12 categories and assign a priority level.
+
+─── CATEGORY DEFINITIONS ────────────────────────────────────────────────────
+theft          – stealing, snatching, chain snatching, pickpocketing, shoplifting, burglary, vehicle theft, house break-in, robbery (even with force if primary intent is to take property)
+assault        – physical attack/beating/punching/kicking/stabbing/shooting causing bodily harm; physical fights; mob violence; acid attack (NOT purely sexual — use harassment for that)
+harassment     – sexual harassment, eve-teasing, molestation, stalking, verbal/mental abuse, threatening calls/messages, blackmail, workplace harassment, online abuse (non-financial)
+traffic        – road accident, vehicle collision, drunk driving, rash/negligent driving, hit-and-run, road rage, traffic signal violations, vehicle breakdown causing hazard
+fraud          – financial cheating, investment scam, job scam, property fraud, insurance fraud, impersonation for financial gain, fake documents, UPI/bank transfer fraud, offline payment fraud
+cybercrime     – hacking, phishing, OTP/SIM swap fraud, social media account takeover, ransomware, data breach, online threats/impersonation WITHOUT financial motive, dark-web activity
+domestic       – domestic violence, dowry harassment/demand, marital dispute with violence or threat, child abuse within family, elder abuse at home, cruelty by spouse/in-laws
+missing_person – person reported missing (adult or child), suspected kidnapping or abduction, person not contactable and whereabouts unknown
+drug_activity  – drug dealing/peddling, narcotics possession/consumption, ganja/marijuana/cocaine/heroin/MDMA, illegal alcohol/liquor, drug trafficking
+vandalism      – deliberate property damage, graffiti, arson (small-scale), destruction of public/private assets, breaking windows/vehicles
+noise          – noise disturbance, loud music/DJ/loudspeaker, late-night party, construction noise, industrial noise complaint
+other          – genuinely does not fit any category above
+─────────────────────────────────────────────────────────────────────────────
+
+─── DISAMBIGUATION RULES (read carefully) ───────────────────────────────────
+• Chain snatching / purse snatching → theft (not assault, even if attacker pushed victim)
+• Physical fight or beating → assault (even between family members, unless it's a recurring domestic violence pattern)
+• Ongoing domestic abuse by spouse/family → domestic (not assault)
+• Sexual misconduct, eve-teasing, molestation → harassment (not assault)
+• Online financial fraud / UPI scam → fraud (NOT cybercrime)
+• Account hacking leading to financial theft → cybercrime (not fraud)
+• Missing + credible kidnapping → missing_person (not assault)
+• Drug use/possession (personal) → drug_activity (not other)
+• Vandalism + assault in same incident → choose the more serious one (assault)
+• If genuinely ambiguous → pick the primary act described
+─────────────────────────────────────────────────────────────────────────────
+
+─── PRIORITY RULES ──────────────────────────────────────────────────────────
+critical  – murder/attempt to murder, rape, kidnapping/abduction, bomb/terror threat, child in imminent danger, armed robbery with weapon
+high      – serious assault with injury, robbery (unarmed but confrontational), missing person (especially child), domestic violence with injury, drug peddling/trafficking, serious accident with casualties
+medium    – theft, harassment, fraud, cybercrime, drug possession/use, hit-and-run without severe injury, vandalism
+low       – noise complaints, minor property damage, general disturbances without threat to life
+─────────────────────────────────────────────────────────────────────────────
 
 Complaint Title: {title}
 Complaint Description: {description}
 
-Return exactly this JSON structure:
-{{
-  "category": "<one of: theft, assault, harassment, traffic, fraud, cybercrime, domestic, missing_person, drug_activity, vandalism, noise, other>",
-  "priority": "<one of: low, medium, high, critical>",
-  "summary": "<one concise sentence describing the incident and recommended action>"
-}}
-
-Priority assignment rules:
-- critical: murder, rape, kidnapping, bomb/terror threat, child in danger, armed robbery
-- high: assault, robbery without weapon, missing person, serious accident, domestic violence
-- medium: theft, harassment, fraud, cybercrime, drug activity, traffic violations
-- low: noise complaints, minor vandalism, general nuisance
-
-Respond ONLY with the JSON object. No other text."""
+Respond with ONLY valid JSON — no markdown fences, no explanation:
+{{"category": "<category>", "priority": "<priority>", "summary": "<one sentence: what happened and recommended action>"}}"""
 
 
 def _parse_ai_json(text: str) -> dict | None:
@@ -168,6 +230,7 @@ def _analyze_with_groq(title: str, description: str, custom_prompt: str | None =
 
     for i, key in enumerate(keys, 1):
         try:
+            _GroqRateLimiter.wait()      # honour 28-call/min RPM cap
             client = Groq(api_key=key)
             response = client.chat.completions.create(
                 model='llama-3.3-70b-versatile',
@@ -275,6 +338,7 @@ def _analyze_with_groq_key(title: str, description: str, key_index: int = 0) -> 
     prompt = _build_prompt(title, description)
 
     try:
+        _GroqRateLimiter.wait()          # honour 28-call/min RPM cap
         client   = Groq(api_key=keys[key_index])
         response = client.chat.completions.create(
             model='llama-3.3-70b-versatile',
@@ -284,7 +348,7 @@ def _analyze_with_groq_key(title: str, description: str, key_index: int = 0) -> 
         )
         result = _parse_ai_json(response.choices[0].message.content)
         if result:
-            result['ai_provider']   = f'groq-key-{key_label}'
+            result['ai_provider']    = f'groq-key-{key_label}'
             result['provider_label'] = f'Groq Llama-3.3-70b (Key {key_label})'
             logger.info(f'Groq key {key_label} (single): cat={result["category"]}, pri={result["priority"]}')
             return result
@@ -434,53 +498,6 @@ def compute_severity(title: str, description: str, category: str, priority: str 
         f'content={content:.1f}, pri={priority}/{pri_score}, blended={blended:.2f})'
     )
     return final
-
-
-def suggest_route(
-    from_lat: float, from_lon: float,
-    to_lat: float, to_lon: float,
-    is_perishable: bool = False,
-) -> dict:
-    """Route suggestion for farmer transport using Haversine distance."""
-    R = 6371
-    phi1, phi2 = math.radians(from_lat), math.radians(to_lat)
-    dphi    = math.radians(to_lat - from_lat)
-    dlambda = math.radians(to_lon - from_lon)
-    a    = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    dist = R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
-    mid_lat = (from_lat + to_lat) / 2
-    mid_lon = (from_lon + to_lon) / 2
-    speed   = 45 if is_perishable else 35
-    dur_h   = dist / speed
-
-    logger.debug(f'Route computed: {round(dist, 2)} km, ~{round(dur_h, 2)} h, perishable={is_perishable}')
-    return {
-        'distance_km'       : round(dist, 2),
-        'duration_hours'    : round(dur_h, 2),
-        'duration_formatted': f"{int(dur_h)}h {int((dur_h % 1) * 60)}m",
-        'route_type'        : 'express' if is_perishable else 'standard',
-        'waypoints'         : [
-            {'lat': from_lat, 'lon': from_lon, 'label': 'Pickup Location',      'type': 'start'},
-            {'lat': mid_lat,  'lon': mid_lon,  'label': 'Midpoint Checkpoint',  'type': 'checkpoint'},
-            {'lat': to_lat,   'lon': to_lon,   'label': 'Destination Facility', 'type': 'end'},
-        ],
-        'tips'              : _get_route_tips(is_perishable, dist),
-        'generated_at'      : datetime.now().isoformat(),
-    }
-
-
-def _get_route_tips(is_perishable: bool, dist_km: float) -> list:
-    tips = []
-    if is_perishable:
-        tips.append('Perishable cargo: Use refrigerated vehicle if possible.')
-        tips.append('Depart early morning (5-7 AM) to avoid heat.')
-    if dist_km > 100:
-        tips.append('Long route: Plan for 1-2 fuel stops.')
-        tips.append('Keep GPS active and share location with family.')
-    tips.append('Carry required documents: vehicle registration, produce invoice.')
-    tips.append('Notify destination facility 1 hour before arrival.')
-    return tips
 
 
 def get_crime_hotspots(complaints) -> list:

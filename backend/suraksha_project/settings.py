@@ -1,5 +1,5 @@
 """
-SURAKSHA - Unified Intelligent Public Safety & Transport Platform
+SURAKSHA - Intelligent Public Safety Platform
 Django Settings
 """
 
@@ -45,7 +45,6 @@ INSTALLED_APPS = [
     # Local apps
     'apps.accounts',
     'apps.complaints',
-    'apps.transport',
     'apps.intelligence',
 ]
 
@@ -281,12 +280,6 @@ LOGGING = {
         'apps.complaints.signals': {
             'handlers'  : ['console', 'file_all', 'file_errors', 'file_ai'],
             'level'     : 'DEBUG',
-            'propagate' : False,
-        },
-        # Transport app
-        'apps.transport': {
-            'handlers'  : ['console', 'file_all', 'file_errors'],
-            'level'     : 'INFO',
             'propagate' : False,
         },
         # Auth / accounts app

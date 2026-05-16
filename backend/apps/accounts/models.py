@@ -1,6 +1,6 @@
 """
 SURAKSHA - Accounts Models
-Custom User model with role-based access (citizen, authority/admin, farmer)
+Custom User model with role-based access (citizen, authority/admin)
 Django Models (Module 2)
 """
 
@@ -14,7 +14,6 @@ class User(AbstractUser):
     ROLE_CHOICES = [
         ('citizen', 'Citizen'),
         ('authority', 'Authority / Police'),
-        ('farmer', 'Farmer'),
         ('admin', 'System Admin'),
     ]
 
@@ -35,10 +34,6 @@ class User(AbstractUser):
     # Authority-specific fields
     badge_number = models.CharField(max_length=50, blank=True)  # for police
     station_name = models.CharField(max_length=200, blank=True)  # police station
-
-    # Farmer-specific fields
-    farm_location = models.CharField(max_length=300, blank=True)
-    farm_size_acres = models.FloatField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'User'

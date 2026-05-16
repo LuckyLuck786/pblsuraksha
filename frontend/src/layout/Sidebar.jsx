@@ -33,16 +33,6 @@ const ROLE_CONFIG = {
     dot: 'bg-rose-400',
     label: 'Admin Control',
   },
-  farmer: {
-    gradient: 'from-emerald-900/60 to-emerald-950',
-    accent: 'bg-emerald-500',
-    activeGlow: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
-    hoverBg: 'hover:bg-emerald-500/10',
-    iconColor: 'text-emerald-400',
-    badge: 'bg-emerald-900/80 text-emerald-300 border border-emerald-700',
-    dot: 'bg-emerald-400',
-    label: 'Farmer Hub',
-  },
 };
 
 const ICONS = {
@@ -120,7 +110,7 @@ const ICONS = {
 
 const getMenuItems = (role) => {
   const common = [
-    { label: 'Dashboard', path: role === 'farmer' ? '/transport/dashboard' : (role === 'admin' || role === 'authority') ? '/admin/dashboard' : '/dashboard', icon: ICONS.dashboard },
+    { label: 'Dashboard', path: (role === 'admin' || role === 'authority') ? '/admin/dashboard' : '/dashboard', icon: ICONS.dashboard },
     { label: 'Profile', path: '/profile', icon: ICONS.profile },
   ];
 
@@ -138,14 +128,6 @@ const getMenuItems = (role) => {
     { label: 'Analytics', path: '/admin/analytics', icon: ICONS.chart },
     { label: 'Users', path: '/admin/users', icon: ICONS.users },
     { label: 'LLM Analytics', path: '/admin/llm-analytics', icon: ICONS.brain },
-  ];
-
-  if (role === 'farmer') return [
-    ...common,
-    { label: 'New Request', path: '/transport/new', icon: ICONS.plus, badge: 'New' },
-    { label: 'My Requests', path: '/transport/requests', icon: ICONS.list },
-    { label: 'Find Facilities', path: '/transport/facilities', icon: ICONS.factory },
-    { label: 'Active Routes', path: '/transport/active', icon: ICONS.route },
   ];
 
   return common;

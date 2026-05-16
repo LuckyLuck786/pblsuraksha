@@ -183,10 +183,11 @@ def llm_analytics(request):
     if request.user.role not in ('admin', 'authority'):
         return Response({'error': 'Admin/authority access required.'}, status=403)
 
-    sample_size = min(int(request.GET.get('sample', 20)), 50)
+    sample_size = min(int(request.GET.get('sample', 20)), 300)
     logger.info(f'llm_analytics: evaluation requested by {request.user.username}, sample={sample_size}')
 
     from .engine import analyze_all_llms
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
     complaints = list(
         Complaint.objects.exclude(category='')
@@ -196,20 +197,30 @@ def llm_analytics(request):
     if not complaints:
         return Response({'error': 'No complaints available for evaluation.'}, status=404)
 
-    # ── Run all LLMs on each complaint ─────────────────────────────────────
-    eval_rows = []
-    for c in complaints:
+    # ── Run all LLMs on each complaint IN PARALLEL ─────────────────────────
+    # max_workers=8 means 8 complaints at once; each complaint calls 4 providers
+    # in parallel internally → up to ~24 concurrent API calls (Gemini 429s early).
+    def _eval_one(c):
         try:
             preds = analyze_all_llms(c.title, c.description)
-            eval_rows.append({
+            return {
                 'complaint_id' : c.complaint_id,
                 'true_category': c.category,
                 'true_priority': c.priority,
                 'true_severity': float(c.severity_score or 0.0),
                 'predictions'  : preds,
-            })
+            }
         except Exception as exc:
             logger.warning(f'Eval skipped for {c.complaint_id}: {exc}')
+            return None
+
+    eval_rows = []
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {executor.submit(_eval_one, c): c.complaint_id for c in complaints}
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                eval_rows.append(result)
 
     if not eval_rows:
         return Response({'error': 'Could not evaluate any complaints.'}, status=500)
@@ -304,7 +315,7 @@ def llm_analytics(request):
     # ── Research paper reference values (Table II & IV from paper) ──────────
     paper_reference = {
         'groq-key-1': {
-            'latency_s': 1.2, 'macro_f1': 0.949, 'availability_pct': 99.5,
+            'latency_s': 1.2, 'macro_f1': 0.964, 'availability_pct': 99.5,
             'severity_mae': 0.43, 'severity_spearman': 0.93,
             'per_category_f1': {
                 'theft': 0.965, 'assault': 0.945, 'harassment': 0.935,

@@ -32,7 +32,7 @@ def get_tokens_for_user(user):
 def register(request):
     """
     POST /api/auth/register/
-    Register a new user (citizen, authority, or farmer)
+    Register a new user (citizen or authority)
     """
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
@@ -111,7 +111,6 @@ def dashboard_stats(request):
     Returns personalized stats for the logged-in user
     """
     from apps.complaints.models import Complaint
-    from apps.transport.models import TransportRequest
 
     user = request.user
 
@@ -132,14 +131,6 @@ def dashboard_stats(request):
             'resolved': resolved,
             'high_priority': high_priority,
             'critical_priority': critical_priority,
-            'total_transport_requests': TransportRequest.objects.count(),
-        })
-    elif user.role == 'farmer':
-        return Response({
-            'role': user.role,
-            'my_complaints': Complaint.objects.filter(reporter=user).count(),
-            'my_transport_requests': TransportRequest.objects.filter(farmer=user).count(),
-            'active_transport': TransportRequest.objects.filter(farmer=user, status='in_transit').count(),
         })
     else:
         # Citizen

@@ -3,8 +3,8 @@ import { useAuth } from '../../context/AuthContext';
 import { authAPI } from '../../utils/api';
 import toast from 'react-hot-toast';
 
-const ROLE_LABELS = { citizen: 'Citizen', authority: 'Authority / Police', farmer: 'Farmer', admin: 'System Admin' };
-const ROLE_COLORS = { citizen: 'bg-blue-100 text-blue-700', authority: 'bg-purple-100 text-purple-700', farmer: 'bg-green-100 text-green-700', admin: 'bg-red-100 text-red-700' };
+const ROLE_LABELS = { citizen: 'Citizen', authority: 'Authority / Police', admin: 'System Admin' };
+const ROLE_COLORS = { citizen: 'bg-blue-100 text-blue-700', authority: 'bg-purple-100 text-purple-700', admin: 'bg-red-100 text-red-700' };
 
 const ProfilePage = () => {
     const { user, updateUser } = useAuth();
@@ -21,7 +21,6 @@ const ProfilePage = () => {
         pincode: user?.pincode || '',
         badge_number: user?.badge_number || '',
         station_name: user?.station_name || '',
-        farm_location: user?.farm_location || '',
     });
 
     const handleChange = e => setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -52,7 +51,6 @@ const ProfilePage = () => {
             pincode: user?.pincode || '',
             badge_number: user?.badge_number || '',
             station_name: user?.station_name || '',
-            farm_location: user?.farm_location || '',
         });
         setEditing(false);
     };
@@ -143,12 +141,6 @@ const ProfilePage = () => {
                         </div>
                     )}
 
-                    {user?.role === 'farmer' && (
-                        <div className="border-t pt-4">
-                            <h3 className="text-xs font-bold text-green-600 uppercase tracking-wider mb-3">Farm Details</h3>
-                            <Field label="Farm Location" name="farm_location" value={user?.farm_location} placeholder="Village, Taluk, District" />
-                        </div>
-                    )}
 
                     {/* Account Info (read-only) */}
                     <div className="border-t pt-4 grid grid-cols-2 gap-5">

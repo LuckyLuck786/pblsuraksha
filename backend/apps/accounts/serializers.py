@@ -18,7 +18,7 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'first_name', 'last_name', 'full_name',
             'role', 'phone', 'address', 'city', 'state', 'pincode',
             'avatar', 'is_verified', 'latitude', 'longitude',
-            'badge_number', 'station_name', 'farm_location', 'farm_size_acres',
+            'badge_number', 'station_name',
             'created_at', 'date_joined',
         ]
         read_only_fields = ['id', 'created_at', 'date_joined', 'is_verified']
@@ -34,7 +34,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = [
             'username', 'email', 'password', 'password_confirm',
             'first_name', 'last_name', 'role', 'phone', 'city', 'state',
-            'badge_number', 'station_name', 'farm_location',
+            'badge_number', 'station_name',
         ]
 
     def validate(self, data):
@@ -75,5 +75,5 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'first_name', 'last_name', 'phone', 'address',
             'city', 'state', 'pincode', 'avatar',
-            'latitude', 'longitude', 'farm_location', 'farm_size_acres',
+            'latitude', 'longitude',
         ]

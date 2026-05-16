@@ -5,7 +5,6 @@ import toast from 'react-hot-toast';
 const NOTIF_ICONS = {
     complaint_update: '📋',
     new_assignment: '✅',
-    transport_update: '🚚',
     system: '🔔',
 };
 

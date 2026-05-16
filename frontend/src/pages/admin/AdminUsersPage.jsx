@@ -4,7 +4,6 @@ import { authAPI } from '../../utils/api';
 const ROLE_STYLES = {
     citizen: 'bg-blue-100 text-blue-700',
     authority: 'bg-purple-100 text-purple-700',
-    farmer: 'bg-green-100 text-green-700',
     admin: 'bg-red-100 text-red-700',
 };
 
@@ -42,11 +41,10 @@ const AdminUsersPage = () => {
             <h1 className="text-2xl font-bold text-gray-100 mb-6">User Management</h1>
 
             {/* Role Stats */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-3 gap-4 mb-6">
                 {[
                     { role: 'citizen', label: 'Citizens', color: 'text-blue-400' },
                     { role: 'authority', label: 'Authorities', color: 'text-purple-400' },
-                    { role: 'farmer', label: 'Farmers', color: 'text-green-400' },
                     { role: 'admin', label: 'Admins', color: 'text-red-400' },
                 ].map(r => (
                     <div key={r.role} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
@@ -73,7 +71,6 @@ const AdminUsersPage = () => {
                     <option value="">All Roles</option>
                     <option value="citizen">Citizen</option>
                     <option value="authority">Authority</option>
-                    <option value="farmer">Farmer</option>
                     <option value="admin">Admin</option>
                 </select>
             </div>

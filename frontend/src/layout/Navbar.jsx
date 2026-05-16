@@ -7,7 +7,6 @@ const ROLE_COLORS = {
   citizen: { bg: 'from-blue-600 to-blue-700', dot: 'bg-blue-400', text: 'text-blue-300', label: 'Citizen' },
   authority: { bg: 'from-purple-600 to-purple-700', dot: 'bg-purple-400', text: 'text-purple-300', label: 'Authority' },
   admin: { bg: 'from-rose-600 to-rose-700', dot: 'bg-rose-400', text: 'text-rose-300', label: 'Admin' },
-  farmer: { bg: 'from-emerald-600 to-emerald-700', dot: 'bg-emerald-400', text: 'text-emerald-300', label: 'Farmer' },
 };
 
 const ShieldIcon = () => (

@@ -14,6 +14,5 @@ urlpatterns = [
     # API v1 routes
     path('api/auth/', include('apps.accounts.urls')),
     path('api/complaints/', include('apps.complaints.urls')),
-    path('api/transport/', include('apps.transport.urls')),
     path('api/intelligence/', include('apps.intelligence.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

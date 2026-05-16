@@ -7,7 +7,6 @@ const STEPS = ['Role & Name', 'Account Details', 'Contact Info'];
 const ROLES = [
   { value: 'citizen', label: 'Citizen', icon: '👤', desc: 'Report incidents & track cases' },
   { value: 'authority', label: 'Police Authority', icon: '🚔', desc: 'Manage & resolve complaints' },
-  { value: 'farmer', label: 'Farmer', icon: '🌾', desc: 'Transport & storage logistics' },
 ];
 
 const InputField = ({ label, icon, error, ...props }) => (
@@ -36,7 +35,7 @@ const RegisterPage = () => {
   const [form, setForm] = useState({
     username: '', email: '', password: '', password_confirm: '',
     first_name: '', last_name: '', phone: '', city: '', state: 'Karnataka',
-    badge_number: '', station_name: '', farm_location: '',
+    badge_number: '', station_name: '',
   });
 
   const update = (e) => {
@@ -74,12 +73,10 @@ const RegisterPage = () => {
     try {
       const payload = { ...form, role };
       if (role !== 'authority') { delete payload.badge_number; delete payload.station_name; }
-      if (role !== 'farmer') delete payload.farm_location;
       const data = await register(payload);
       toast.success('Account created! Welcome to SURAKSHA 🛡️');
       const r = data?.user?.role;
       if (r === 'admin' || r === 'authority') navigate('/admin/dashboard');
-      else if (r === 'farmer') navigate('/transport/dashboard');
       else navigate('/dashboard');
     } catch (err) {
       const msg = err.response?.data?.username?.[0] || err.response?.data?.email?.[0] || err.response?.data?.detail || 'Registration failed. Please try again.';
@@ -195,12 +192,6 @@ const RegisterPage = () => {
           </div>
         )}
 
-        {role === 'farmer' && (
-          <div className="p-4 bg-emerald-900/20 border border-emerald-700/40 rounded-xl">
-            <p className="text-xs font-semibold text-emerald-300 uppercase tracking-wider mb-3">Farm Details</p>
-            <InputField label="Farm Location" name="farm_location" value={form.farm_location} onChange={update} placeholder="Village/Taluk/District" />
-          </div>
-        )}
       </div>
     ),
   };
@@ -223,7 +214,7 @@ const RegisterPage = () => {
           <h1 className="text-3xl font-extrabold text-white tracking-widest mb-2">SURAKSHA</h1>
           <p className="text-indigo-300 text-sm tracking-wider mb-8">SAFETY INTELLIGENCE PLATFORM</p>
           <p className="text-indigo-200/70 text-sm leading-relaxed max-w-xs">
-            Join thousands of citizens, authorities, and farmers using AI-powered tools to build safer communities.
+            Join thousands of citizens and authorities using AI-powered tools to build safer communities.
           </p>
         </div>
       </div>

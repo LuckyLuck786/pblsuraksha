@@ -106,6 +106,26 @@ const ICONS = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
     </svg>
   ),
+  search: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    </svg>
+  ),
+  trend: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+    </svg>
+  ),
+  shield: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+  ),
+  anonymous: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
 };
 
 const getMenuItems = (role) => {
@@ -118,6 +138,7 @@ const getMenuItems = (role) => {
     ...common,
     { label: 'File Complaint', path: '/citizen/complaint/new', icon: ICONS.complaint, badge: 'New' },
     { label: 'My Complaints', path: '/citizen/complaints', icon: ICONS.list },
+    { label: 'Anonymous Tip', path: '/citizen/tip', icon: ICONS.anonymous },
     { label: 'Notifications', path: '/citizen/notifications', icon: ICONS.bell },
   ];
 
@@ -125,7 +146,10 @@ const getMenuItems = (role) => {
     ...common,
     { label: 'All Complaints', path: '/admin/complaints', icon: ICONS.list },
     { label: 'Crime Hotspots', path: '/admin/hotspots', icon: ICONS.map },
+    { label: 'Predicted Hotspots', path: '/admin/predicted-hotspots', icon: ICONS.shield },
     { label: 'Analytics', path: '/admin/analytics', icon: ICONS.chart },
+    { label: 'Crime Trends', path: '/admin/trends', icon: ICONS.trend },
+    { label: 'NL Query', path: '/admin/nl-query', icon: ICONS.search },
     { label: 'Users', path: '/admin/users', icon: ICONS.users },
     { label: 'LLM Analytics', path: '/admin/llm-analytics', icon: ICONS.brain },
   ];

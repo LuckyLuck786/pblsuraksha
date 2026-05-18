@@ -1,5 +1,5 @@
 /**
- * SURAKSHA - Authentication Context
+ * Safe City Connect - Authentication Context
  * Global state for user authentication
  */
 

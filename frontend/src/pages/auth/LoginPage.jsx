@@ -67,8 +67,8 @@ const LoginPage = () => {
               </svg>
             </div>
             <div>
-              <h1 className="text-white font-black text-xl tracking-widest">SURAKSHA</h1>
-              <p className="text-indigo-300 text-xs tracking-widest">SAFETY INTELLIGENCE</p>
+              <h1 className="text-white font-black text-xl tracking-widest">SAFE CITY CONNECT</h1>
+              <p className="text-indigo-300 text-xs tracking-widest">URBAN SAFETY PLATFORM</p>
             </div>
           </div>
 
@@ -94,7 +94,7 @@ const LoginPage = () => {
         </div>
 
         <p className="relative z-10 text-indigo-400/60 text-xs">
-          © 2025 Suraksha Platform · Government of Karnataka Initiative
+          © 2025 Safe City Connect · Government of Karnataka Initiative
         </p>
       </div>
 
@@ -109,7 +109,7 @@ const LoginPage = () => {
                 <path d="M14 24l4 4 8-8" stroke="#4f46e5" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
-            <span className="text-white font-extrabold tracking-widest text-lg">SURAKSHA</span>
+            <span className="text-white font-extrabold tracking-widest text-lg">SAFE CITY CONNECT</span>
           </div>
 
           <div className="mb-8">

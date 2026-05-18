@@ -129,6 +129,8 @@ class ComplaintEvidence(models.Model):
     file = models.FileField(upload_to='evidence/%Y/%m/%d/')
     file_type = models.CharField(max_length=20, choices=FILE_TYPE_CHOICES, default='image')
     description = models.CharField(max_length=300, blank=True)
+    # AI-generated description from Gemini Vision (set after image upload)
+    ai_description = models.TextField(blank=True, default='')
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True
     )

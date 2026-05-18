@@ -4,7 +4,7 @@ import logger from '../utils/logger';
 const boundaryLogger = logger.module('ErrorBoundary');
 
 /**
- * SURAKSHA - Global React Error Boundary
+ * Safe City Connect - Global React Error Boundary
  * ========================================
  * Catches render-time errors in any child component tree.
  * Shows a friendly fallback UI instead of a blank white screen.
@@ -55,7 +55,7 @@ class ErrorBoundary extends React.Component {
             </div>
             <div>
               <h1 className="text-white font-bold text-lg">Something went wrong</h1>
-              <p className="text-gray-400 text-sm">SURAKSHA encountered an unexpected error</p>
+              <p className="text-gray-400 text-sm">Safe City Connect encountered an unexpected error</p>
             </div>
           </div>
 

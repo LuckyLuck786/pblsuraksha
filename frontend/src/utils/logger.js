@@ -1,5 +1,5 @@
 /**
- * SURAKSHA - Frontend Logger
+ * Safe City Connect - Frontend Logger
  * ===========================
  * Structured client-side logging with levels, timestamps, and optional
  * remote reporting to the backend.

@@ -11,10 +11,11 @@ const PRIORITY_COLORS = {
 };
 
 const PROVIDER_COLORS = {
-    'groq-key-1' : { bg: 'bg-violet-50',  border: 'border-violet-200', badge: 'bg-violet-100 text-violet-800', dot: 'bg-violet-500' },
-    'groq-key-2' : { bg: 'bg-indigo-50',  border: 'border-indigo-200', badge: 'bg-indigo-100 text-indigo-800', dot: 'bg-indigo-500' },
-    'gemini'     : { bg: 'bg-blue-50',    border: 'border-blue-200',   badge: 'bg-blue-100 text-blue-800',     dot: 'bg-blue-500'   },
-    'rule-based' : { bg: 'bg-gray-50',    border: 'border-gray-200',   badge: 'bg-gray-100 text-gray-700',     dot: 'bg-gray-400'   },
+    'groq-llama'      : { bg: 'bg-violet-50',  border: 'border-violet-200', badge: 'bg-violet-100 text-violet-800', dot: 'bg-violet-500' },
+    'groq-qwen'       : { bg: 'bg-indigo-50',  border: 'border-indigo-200', badge: 'bg-indigo-100 text-indigo-800', dot: 'bg-indigo-500' },
+    'cerebras-gptoss' : { bg: 'bg-purple-50',  border: 'border-purple-200', badge: 'bg-purple-100 text-purple-800', dot: 'bg-purple-500' },
+    'gemini'          : { bg: 'bg-blue-50',    border: 'border-blue-200',   badge: 'bg-blue-100 text-blue-800',     dot: 'bg-blue-500'   },
+    'rule-based'      : { bg: 'bg-gray-50',    border: 'border-gray-200',   badge: 'bg-gray-100 text-gray-700',     dot: 'bg-gray-400'   },
 };
 
 function AgreementBanner({ results }) {
@@ -111,6 +112,7 @@ const CreateComplaintPage = () => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errors, setErrors] = useState({});
+    const [duplicateWarning, setDuplicateWarning] = useState(null);
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -125,11 +127,25 @@ const CreateComplaintPage = () => {
         }
         setIsAnalyzing(true);
         setAllAnalyses(null);
+        setDuplicateWarning(null);
         try {
-            const res = await intelligenceAPI.analyzeAll(formData.title, formData.description);
-            setAllAnalyses(res.data.results);
-            const successCount = res.data.results.filter(r => r.success).length;
-            toast.success(`Analysis complete — ${successCount}/4 models responded`);
+            // Run AI analysis + duplicate check in parallel
+            const [analysisRes, dupRes] = await Promise.allSettled([
+                intelligenceAPI.analyzeAll(formData.title, formData.description),
+                intelligenceAPI.checkDuplicate(formData.title, formData.description, formData.incident_location),
+            ]);
+
+            if (analysisRes.status === 'fulfilled') {
+                setAllAnalyses(analysisRes.value.data.results);
+                const successCount = analysisRes.value.data.results.filter(r => r.success).length;
+                toast.success(`Analysis complete — ${successCount}/4 models responded`);
+            } else {
+                toast.error('AI analysis failed. You can still submit the complaint.');
+            }
+
+            if (dupRes.status === 'fulfilled' && dupRes.value.data?.is_duplicate) {
+                setDuplicateWarning(dupRes.value.data);
+            }
         } catch (error) {
             toast.error('AI analysis failed. You can still submit the complaint.');
         } finally {
@@ -229,8 +245,26 @@ const CreateComplaintPage = () => {
                                 <>⚡ Analyze with All Models</>
                             )}
                         </button>
-                        <span className="text-xs text-gray-400">Groq (×2) + Gemini + Rule-based in parallel</span>
+                        <span className="text-xs text-gray-400">Groq (×3 models) + Gemini + Rule-based in parallel</span>
                     </div>
+
+                    {/* Duplicate Warning */}
+                    {duplicateWarning && (
+                        <div className="rounded-xl border border-amber-400/60 bg-amber-50 p-4">
+                            <div className="flex items-start gap-3">
+                                <span className="text-xl mt-0.5">⚠️</span>
+                                <div>
+                                    <p className="text-sm font-bold text-amber-800">Possible Duplicate Detected</p>
+                                    <p className="text-xs text-amber-700 mt-1">{duplicateWarning.reason}</p>
+                                    <p className="text-xs text-amber-600 mt-1">
+                                        Similarity: <strong>{Math.round((duplicateWarning.similarity_score || 0) * 100)}%</strong>
+                                        {duplicateWarning.likely_match_id && ` · Possible match: ${duplicateWarning.likely_match_id}`}
+                                    </p>
+                                    <p className="text-xs text-amber-600 mt-1">You can still submit — our officers will review both cases.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* All Models Results */}
                     {allAnalyses && (
@@ -245,6 +279,20 @@ const CreateComplaintPage = () => {
                                     <ProviderCard key={result.provider_key} result={result} />
                                 ))}
                             </div>
+                            {/* IPC Sections from best model */}
+                            {(() => {
+                                const best = allAnalyses.find(r => r.success && r.ipc_sections?.length);
+                                return best?.ipc_sections?.length ? (
+                                    <div className="rounded-lg border border-purple-200 bg-purple-50 p-3">
+                                        <p className="text-xs font-semibold text-purple-700 mb-2">⚖️ Applicable IPC / IT Act Sections</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {best.ipc_sections.map(s => (
+                                                <span key={s} className="text-xs px-2 py-1 rounded-full bg-purple-100 border border-purple-300 text-purple-800 font-medium">{s}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : null;
+                            })()}
                         </div>
                     )}
 

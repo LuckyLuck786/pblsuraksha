@@ -167,9 +167,10 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800
 
 # ─── AI API Keys ───────────────────────────────────────────────────────────
 # Set these in backend/.env or as environment variables
-GROQ_API_KEY_1 = _env('GROQ_API_KEY_1')
-GROQ_API_KEY_2 = _env('GROQ_API_KEY_2')
-GEMINI_API_KEY = _env('GEMINI_API_KEY')
+GROQ_API_KEY_1   = _env('GROQ_API_KEY_1')   # Key 1 → llama-3.3-70b-versatile
+GROQ_API_KEY_2   = _env('GROQ_API_KEY_2')   # Key 2 → qwen/qwen3-32b
+GEMINI_API_KEY   = _env('GEMINI_API_KEY')   # gemini-3.1-flash-lite
+CEREBRAS_API_KEY = _env('CEREBRAS_API_KEY') # gpt-oss-120b via Cerebras inference
 
 # ─── RAG Store ────────────────────────────────────────────────────────────
 RAG_STORE_PATH = BASE_DIR / 'rag_store'
@@ -312,3 +313,36 @@ LOGGING = {
         },
     },
 }
+
+# ─── SMS OTP Provider ──────────────────────────────────────────────────────
+# Fast2SMS (recommended for India, free tier available):
+#   1. Register at https://www.fast2sms.com/
+#   2. Go to Dev API → copy your API key
+#   3. Add to backend/.env:  FAST2SMS_API_KEY=your_key_here
+TWOFACTOR_API_KEY   = _env('TWOFACTOR_API_KEY') # 2factor.in — easiest India OTP, no DLT needed
+FAST2SMS_API_KEY    = _env('FAST2SMS_API_KEY')  # Fast2SMS — needs website verification for OTP route
+
+# Twilio (international, requires paid account):
+TWILIO_ACCOUNT_SID  = _env('TWILIO_ACCOUNT_SID')
+TWILIO_AUTH_TOKEN   = _env('TWILIO_AUTH_TOKEN')
+TWILIO_FROM_NUMBER  = _env('TWILIO_FROM_NUMBER')
+# If neither is configured, OTP is printed to server console + returned as dev_otp in API response.
+
+# ─── Email (Email Verification) ───────────────────────────────────────────
+# For dev: console backend prints emails to stdout (no real mail sent).
+# For prod: switch to smtp and set EMAIL_HOST_* env vars.
+EMAIL_BACKEND   = _env('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST      = _env('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT      = int(_env('EMAIL_PORT', '587'))
+EMAIL_USE_TLS   = _env('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_HOST_USER = _env('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = _env('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL  = _env('DEFAULT_FROM_EMAIL', 'noreply@safecityconnect.in')
+
+# ─── Anonymous Tip Settings ───────────────────────────────────────────────
+# Random secret used when SHA-256 hashing reporter identity for anonymous tips.
+# Change this in production and keep it secret.
+ANONYMOUS_TIP_SALT = _env('ANONYMOUS_TIP_SALT', 'safe-city-connect-anon-salt-change-in-prod')
+
+# ─── Frontend URL (used in email verification links) ──────────────────────
+FRONTEND_URL = _env('FRONTEND_URL', 'http://localhost:3000')

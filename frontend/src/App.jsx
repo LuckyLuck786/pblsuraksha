@@ -12,6 +12,7 @@ import DashboardPage from './pages/citizen/DashboardPage';
 import CreateComplaintPage from './pages/citizen/CreateComplaintPage';
 import CitizenComplaintsPage from './pages/citizen/CitizenComplaintsPage';
 import NotificationsPage from './pages/citizen/NotificationsPage';
+import AnonymousTipPage from './pages/citizen/AnonymousTipPage';
 
 // Admin / Authority Pages
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
@@ -20,6 +21,9 @@ import AdminComplaintsPage from './pages/admin/AdminComplaintsPage';
 import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import LLMAnalyticsPage from './pages/admin/LLMAnalyticsPage';
+import NLQueryPage from './pages/admin/NLQueryPage';
+import CrimeTrendsPage from './pages/admin/CrimeTrendsPage';
+import PredictedHotspotsPage from './pages/admin/PredictedHotspotsPage';
 
 // Profile
 import ProfilePage from './pages/profile/ProfilePage';
@@ -31,7 +35,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
         <div className="flex items-center justify-center h-screen bg-gray-900">
             <div className="text-center">
                 <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-gray-400 text-sm">Loading Suraksha...</p>
+                <p className="text-gray-400 text-sm">Loading Safe City Connect...</p>
             </div>
         </div>
     );
@@ -92,6 +96,9 @@ function App() {
                         <Route path="citizen/notifications" element={
                             <ProtectedRoute allowedRoles={['citizen']}><NotificationsPage /></ProtectedRoute>
                         } />
+                        <Route path="citizen/tip" element={
+                            <ProtectedRoute allowedRoles={['citizen']}><AnonymousTipPage /></ProtectedRoute>
+                        } />
 
                         {/* ── Admin / Authority ──────────────────────── */}
                         <Route path="admin/dashboard" element={
@@ -106,8 +113,17 @@ function App() {
                         <Route path="admin/hotspots" element={
                             <ProtectedRoute allowedRoles={['admin', 'authority']}><HotspotMapPage /></ProtectedRoute>
                         } />
+                        <Route path="admin/predicted-hotspots" element={
+                            <ProtectedRoute allowedRoles={['admin', 'authority']}><PredictedHotspotsPage /></ProtectedRoute>
+                        } />
                         <Route path="admin/analytics" element={
                             <ProtectedRoute allowedRoles={['admin', 'authority']}><AdminAnalyticsPage /></ProtectedRoute>
+                        } />
+                        <Route path="admin/trends" element={
+                            <ProtectedRoute allowedRoles={['admin', 'authority']}><CrimeTrendsPage /></ProtectedRoute>
+                        } />
+                        <Route path="admin/nl-query" element={
+                            <ProtectedRoute allowedRoles={['admin', 'authority']}><NLQueryPage /></ProtectedRoute>
                         } />
                         <Route path="admin/users" element={
                             <ProtectedRoute allowedRoles={['admin', 'authority']}><AdminUsersPage /></ProtectedRoute>

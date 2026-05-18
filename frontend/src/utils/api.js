@@ -1,5 +1,5 @@
 /**
- * SURAKSHA - API Service Layer
+ * Safe City Connect - API Service Layer
  * Centralized axios instance with JWT auth interceptors and structured logging.
  */
 
@@ -105,11 +105,23 @@ api.interceptors.response.use(
 
 // ── Auth APIs ──────────────────────────────────────────────────────────────
 export const authAPI = {
-  register        : (data) => api.post('/auth/register/', data),
-  login           : (data) => api.post('/auth/login/', data),
-  getProfile      : ()     => api.get('/auth/profile/'),
-  updateProfile   : (data) => api.patch('/auth/profile/', data),
-  getDashboardStats: ()    => api.get('/auth/dashboard-stats/'),
+  register           : (data) => api.post('/auth/register/', data),
+  login              : (data) => api.post('/auth/login/', data),
+  getProfile         : ()     => api.get('/auth/profile/'),
+  updateProfile      : (data) => api.patch('/auth/profile/', data),
+  getDashboardStats  : ()     => api.get('/auth/dashboard-stats/'),
+
+  // ── Phone OTP verification ─────────────────────────────────────────────
+  sendOtp            : (phone) => api.post('/auth/send-otp/', { phone }),
+  verifyOtp          : (phone, otp_code) => api.post('/auth/verify-otp/', { phone, otp_code }),
+
+  // ── Email verification ─────────────────────────────────────────────────
+  sendEmailVerification: ()      => api.post('/auth/send-email-verification/'),
+  verifyEmail          : (token) => api.post('/auth/verify-email/', { token }),
+
+  // ── Admin user management ──────────────────────────────────────────────
+  // action: 'block' | 'unblock' | 'delete'
+  manageUser           : (userId, action) => api.post(`/auth/users/${userId}/manage/`, { action }),
 };
 
 // ── Complaints APIs ────────────────────────────────────────────────────────
@@ -125,16 +137,39 @@ export const complaintsAPI = {
   getAnalytics        : ()     => api.get('/complaints/data/analytics/'),
   getNotifications    : ()     => api.get('/complaints/data/notifications/'),
   markNotificationsRead: ()    => api.post('/complaints/data/notifications/read/'),
+
+  // ── Export ────────────────────────────────────────────────────────────
+  exportComplaints    : (format = 'xlsx', params = {}) =>
+    api.get('/complaints/export/', { params: { format, ...params }, responseType: 'blob' }),
+
+  // ── Anonymous Tip ─────────────────────────────────────────────────────
+  submitAnonymousTip  : (data) => api.post('/complaints/anonymous-tip/', data),
 };
 
 // ── Intelligence APIs ──────────────────────────────────────────────────────
 export const intelligenceAPI = {
-  analyzeText    : (title, description) => api.post('/intelligence/analyze/', { title, description }),
-  getHotspots    : ()                   => api.get('/intelligence/hotspots/'),
-  getMapData     : ()                   => api.get('/intelligence/map-data/'),
-  getInsights    : ()                   => api.get('/intelligence/insights/'),
-  analyzeAll     : (title, description) => api.post('/intelligence/analyze-all/', { title, description }),
-  getLLMAnalytics: (sample = 20)        => api.get(`/intelligence/llm-analytics/?sample=${sample}`, { timeout: 300000 }), // 5-min timeout for bulk eval
+  analyzeText       : (title, description) => api.post('/intelligence/analyze/', { title, description }),
+  getHotspots       : ()                   => api.get('/intelligence/hotspots/'),
+  getMapData        : ()                   => api.get('/intelligence/map-data/'),
+  getInsights       : ()                   => api.get('/intelligence/insights/'),
+  analyzeAll        : (title, description) => api.post('/intelligence/analyze-all/', { title, description }),
+  getLLMAnalytics   : (sample = 20)        => api.get(`/intelligence/llm-analytics/?sample=${sample}`, { timeout: 300000 }),
+
+  // ── New AI features ───────────────────────────────────────────────────
+  checkDuplicate    : (title, description, incident_location) =>
+    api.post('/intelligence/check-duplicate/', { title, description, incident_location }),
+
+  investigationSummary: (complaintId) =>
+    api.post(`/intelligence/investigation-summary/${complaintId}/`),
+
+  nlQuery           : (question) => api.post('/intelligence/nl-query/', { question }),
+
+  getCrimeTrends    : (days = 90) => api.get(`/intelligence/trends/?days=${days}`),
+
+  getPredictedHotspots: (days = 30) => api.get(`/intelligence/predicted-hotspots/?days=${days}`),
+
+  translateComplaint: (title, description) =>
+    api.post('/intelligence/translate/', { title, description }),
 };
 
 export default api;

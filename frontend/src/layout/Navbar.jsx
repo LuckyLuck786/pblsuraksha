@@ -191,8 +191,8 @@ const Navbar = () => {
         <div className="flex items-center gap-3">
           <ShieldIcon />
           <div>
-            <h1 className="text-base font-extrabold text-white tracking-widest leading-none">SURAKSHA</h1>
-            <p className="text-[9px] text-gray-500 tracking-widest leading-none mt-0.5">SAFETY INTELLIGENCE PLATFORM</p>
+            <h1 className="text-base font-extrabold text-white tracking-widest leading-none">SAFE CITY CONNECT</h1>
+            <p className="text-[9px] text-gray-500 tracking-widest leading-none mt-0.5">URBAN SAFETY PLATFORM</p>
           </div>
         </div>
 

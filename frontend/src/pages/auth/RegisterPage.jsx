@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { authAPI } from '../../utils/api';
 import toast from 'react-hot-toast';
 
-const STEPS = ['Role & Name', 'Account Details', 'Contact Info'];
+const STEPS = ['Role & Name', 'Account Details', 'Contact Info', 'Verify Phone'];
 const ROLES = [
   { value: 'citizen', label: 'Citizen', icon: '👤', desc: 'Report incidents & track cases' },
   { value: 'authority', label: 'Police Authority', icon: '🚔', desc: 'Manage & resolve complaints' },
@@ -23,20 +24,101 @@ const InputField = ({ label, icon, error, ...props }) => (
   </div>
 );
 
+/* ─── OTP Input: 6 single-digit boxes ───────────────────────────────────── */
+const OtpInput = ({ value, onChange, disabled }) => {
+  const digits = (value || '').padEnd(6, '').split('').slice(0, 6);
+  const refs = Array.from({ length: 6 }, () => useRef(null));
+
+  const handleKey = (i, e) => {
+    if (e.key === 'Backspace') {
+      if (digits[i]) {
+        const next = [...digits];
+        next[i] = '';
+        onChange(next.join('').trimEnd());
+      } else if (i > 0) {
+        refs[i - 1].current?.focus();
+      }
+    }
+  };
+
+  const handleChange = (i, e) => {
+    const char = e.target.value.replace(/\D/g, '').slice(-1);
+    if (!char) return;
+    const next = [...digits];
+    next[i] = char;
+    onChange(next.join('').slice(0, 6));
+    if (i < 5) refs[i + 1].current?.focus();
+  };
+
+  const handlePaste = (e) => {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted) { onChange(pasted); refs[Math.min(pasted.length, 5)].current?.focus(); }
+    e.preventDefault();
+  };
+
+  return (
+    <div className="flex gap-2 justify-center">
+      {digits.map((d, i) => (
+        <input
+          key={i}
+          ref={refs[i]}
+          type="text"
+          inputMode="numeric"
+          maxLength={1}
+          value={d}
+          disabled={disabled}
+          onChange={(e) => handleChange(i, e)}
+          onKeyDown={(e) => handleKey(i, e)}
+          onPaste={handlePaste}
+          className={`w-11 h-12 text-center text-lg font-bold rounded-xl border-2 bg-gray-800 text-white focus:outline-none transition
+            ${d ? 'border-indigo-500 bg-indigo-900/20' : 'border-gray-700'}
+            ${disabled ? 'opacity-50 cursor-not-allowed' : 'focus:border-indigo-400'}`}
+        />
+      ))}
+    </div>
+  );
+};
+
+/* ─── Countdown timer ───────────────────────────────────────────────────── */
+const Countdown = ({ seconds, onDone }) => {
+  const [remaining, setRemaining] = useState(seconds);
+  useEffect(() => {
+    setRemaining(seconds);
+    const id = setInterval(() => {
+      setRemaining(r => {
+        if (r <= 1) { clearInterval(id); onDone(); return 0; }
+        return r - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [seconds]); // eslint-disable-line
+  const m = Math.floor(remaining / 60).toString().padStart(2, '0');
+  const s = (remaining % 60).toString().padStart(2, '0');
+  return <span className="font-mono text-indigo-400">{m}:{s}</span>;
+};
+
 const RegisterPage = () => {
   const navigate = useNavigate();
   const { register } = useAuth();
-  const [step, setStep] = useState(0);
+  const [step, setStep]       = useState(0);
   const [loading, setLoading] = useState(false);
-  const [role, setRole] = useState('citizen');
+  const [role, setRole]       = useState('citizen');
   const [showPwd, setShowPwd] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors]   = useState({});
 
   const [form, setForm] = useState({
     username: '', email: '', password: '', password_confirm: '',
     first_name: '', last_name: '', phone: '', city: '', state: 'Karnataka',
     badge_number: '', station_name: '',
   });
+
+  // OTP step state
+  const [otpSent, setOtpSent]         = useState(false);
+  const [otpCode, setOtpCode]         = useState('');
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpLoading, setOtpLoading]   = useState(false);
+  const [canResend, setCanResend]     = useState(false);
+  const [resendKey, setResendKey]     = useState(0); // used to reset countdown
 
   const update = (e) => {
     const { name, value } = e.target;
@@ -56,15 +138,76 @@ const RegisterPage = () => {
       if (form.password !== form.password_confirm) errs.password_confirm = 'Passwords do not match';
     }
     if (step === 2) {
+      if (!form.phone.trim()) errs.phone = 'Phone number is required for verification';
+      else if (!/^\+?[\d\s\-().]{7,15}$/.test(form.phone.trim())) errs.phone = 'Enter a valid phone number';
       if (!form.city.trim()) errs.city = 'Required';
       if (role === 'authority' && !form.badge_number.trim()) errs.badge_number = 'Required';
+    }
+    if (step === 3) {
+      if (!otpVerified) errs.otp = 'Please verify your phone number to continue';
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
-  const handleNext = () => { if (validateStep()) setStep(s => s + 1); };
-  const handleBack = () => setStep(s => s - 1);
+  /* Send OTP via backend */
+  const handleSendOtp = async () => {
+    if (!form.phone.trim()) { setErrors(e => ({ ...e, otp: 'No phone number found' })); return; }
+    setOtpLoading(true);
+    try {
+      await authAPI.sendOtp(form.phone.trim());
+      setOtpSent(true);
+      setCanResend(false);
+      setResendKey(k => k + 1);
+      setOtpCode('');
+      toast.success(`OTP sent to ${form.phone.trim()}`);
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Failed to send OTP. Check your phone number and SMS provider configuration.';
+      toast.error(msg);
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  /* Verify the typed OTP */
+  const handleVerifyOtp = async () => {
+    if (otpCode.length !== 6) { setErrors(e => ({ ...e, otp: 'Enter all 6 digits' })); return; }
+    setOtpLoading(true);
+    try {
+      await authAPI.verifyOtp(form.phone.trim(), otpCode);
+      setOtpVerified(true);
+      setErrors(e => ({ ...e, otp: undefined }));
+      toast.success('✅ Phone number verified!');
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Invalid or expired OTP';
+      toast.error(msg);
+      setErrors(e => ({ ...e, otp: msg }));
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleNext = async () => {
+    if (!validateStep()) return;
+    // Entering OTP step → auto-send OTP
+    if (step === 2) {
+      setErrors({});           // clear any leftover errors before entering OTP step
+      setStep(3);
+      setTimeout(handleSendOtp, 300);
+      return;
+    }
+    setStep(s => s + 1);
+  };
+
+  const handleBack = () => {
+    if (step === 3) {
+      setOtpSent(false);
+      setOtpCode('');
+      setOtpVerified(false);
+      setCanResend(false);
+    }
+    setStep(s => s - 1);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -74,18 +217,36 @@ const RegisterPage = () => {
       const payload = { ...form, role };
       if (role !== 'authority') { delete payload.badge_number; delete payload.station_name; }
       const data = await register(payload);
-      toast.success('Account created! Welcome to SURAKSHA 🛡️');
+
+      // Prompt the browser to save credentials (shows native "Save password?" dialog)
+      if (window.PasswordCredential) {
+        try {
+          const credential = new window.PasswordCredential({
+            id: form.username,
+            password: form.password,
+            name: `${form.first_name} ${form.last_name}`.trim() || form.username,
+          });
+          await navigator.credentials.store(credential);
+        } catch {
+          // Credential Management API not available or user dismissed — non-fatal
+        }
+      }
+
+      toast.success('Account created! Welcome to Safe City Connect 🛡️');
       const r = data?.user?.role;
       if (r === 'admin' || r === 'authority') navigate('/admin/dashboard');
       else navigate('/dashboard');
     } catch (err) {
-      const msg = err.response?.data?.username?.[0] || err.response?.data?.email?.[0] || err.response?.data?.detail || 'Registration failed. Please try again.';
+      const msg = err.response?.data?.username?.[0] || err.response?.data?.email?.[0]
+        || err.response?.data?.phone?.[0]
+        || err.response?.data?.detail || 'Registration failed. Please try again.';
       toast.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
+  /* ── Step content ───────────────────────────────────────────────────────── */
   const stepContent = {
     0: (
       <div className="space-y-5">
@@ -123,6 +284,7 @@ const RegisterPage = () => {
         </div>
       </div>
     ),
+
     1: (
       <div className="space-y-4">
         <InputField label="Username *" icon="@" name="username" value={form.username} onChange={update} placeholder="Choose a username" error={errors.username} required autoComplete="username" />
@@ -164,9 +326,25 @@ const RegisterPage = () => {
         </div>
       </div>
     ),
+
     2: (
       <div className="space-y-4">
-        <InputField label="Phone Number" icon="📞" name="phone" type="tel" value={form.phone} onChange={update} placeholder="+91 XXXXX XXXXX" autoComplete="tel" />
+        {/* Phone — required here for OTP step */}
+        <div>
+          <InputField
+            label="Phone Number *"
+            icon="📞"
+            name="phone"
+            type="tel"
+            value={form.phone}
+            onChange={update}
+            placeholder="+91 XXXXX XXXXX"
+            autoComplete="tel"
+            error={errors.phone}
+            required
+          />
+          <p className="text-xs text-gray-500 mt-1">📱 You'll receive a one-time code on this number to verify your account.</p>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <InputField label="City *" name="city" value={form.city} onChange={update} placeholder="Your city" error={errors.city} required />
           <div>
@@ -191,7 +369,93 @@ const RegisterPage = () => {
             <InputField label="Police Station" name="station_name" value={form.station_name} onChange={update} placeholder="Station name" />
           </div>
         )}
+      </div>
+    ),
 
+    3: (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-900/40 border border-indigo-700/40 flex items-center justify-center mx-auto mb-4">
+            <span className="text-3xl">📱</span>
+          </div>
+          <h3 className="text-white font-bold text-lg">Verify Your Phone</h3>
+          <p className="text-gray-400 text-sm mt-1">
+            We sent a 6-digit code to<br />
+            <span className="text-indigo-300 font-semibold">{form.phone}</span>
+          </p>
+        </div>
+
+        {/* OTP boxes */}
+        <OtpInput value={otpCode} onChange={setOtpCode} disabled={otpVerified || otpLoading} />
+
+        {errors.otp && <p className="text-red-400 text-xs text-center">{errors.otp}</p>}
+
+        {/* Verify button */}
+        {!otpVerified && (
+          <button
+            type="button"
+            disabled={otpCode.length !== 6 || otpLoading}
+            onClick={handleVerifyOtp}
+            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition text-sm flex items-center justify-center gap-2"
+          >
+            {otpLoading ? (
+              <>
+                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Verifying…
+              </>
+            ) : 'Verify Code →'}
+          </button>
+        )}
+
+        {/* Verified badge */}
+        {otpVerified && (
+          <div className="flex items-center gap-3 p-4 bg-green-900/20 border border-green-700/40 rounded-xl">
+            <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+              <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-green-300 font-semibold text-sm">Phone Verified!</p>
+              <p className="text-green-400/70 text-xs">You can now complete your registration.</p>
+            </div>
+          </div>
+        )}
+
+        {/* Resend */}
+        {!otpVerified && (
+          <div className="text-center text-sm text-gray-500">
+            {canResend ? (
+              <button
+                type="button"
+                onClick={handleSendOtp}
+                disabled={otpLoading}
+                className="text-indigo-400 hover:text-indigo-300 font-semibold transition disabled:opacity-50"
+              >
+                Resend OTP
+              </button>
+            ) : (
+              <span>
+                Resend in{' '}
+                <Countdown key={resendKey} seconds={60} onDone={() => setCanResend(true)} />
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Change number */}
+        {!otpVerified && (
+          <p className="text-center text-xs text-gray-600">
+            Wrong number?{' '}
+            <button type="button" onClick={handleBack} className="text-indigo-500 hover:text-indigo-400 transition">
+              Go back to change it
+            </button>
+          </p>
+        )}
       </div>
     ),
   };
@@ -211,11 +475,25 @@ const RegisterPage = () => {
               <path d="M14 24l4 4 8-8" stroke="#4f46e5" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h1 className="text-3xl font-extrabold text-white tracking-widest mb-2">SURAKSHA</h1>
-          <p className="text-indigo-300 text-sm tracking-wider mb-8">SAFETY INTELLIGENCE PLATFORM</p>
+          <h1 className="text-3xl font-extrabold text-white tracking-widest mb-2">SAFE CITY CONNECT</h1>
+          <p className="text-indigo-300 text-sm tracking-wider mb-8">URBAN SAFETY PLATFORM</p>
           <p className="text-indigo-200/70 text-sm leading-relaxed max-w-xs">
             Join thousands of citizens and authorities using AI-powered tools to build safer communities.
           </p>
+
+          {/* Step indicators on the left panel */}
+          <div className="mt-10 space-y-3 text-left w-full max-w-xs mx-auto">
+            {STEPS.map((label, i) => (
+              <div key={i} className={`flex items-center gap-3 transition-all ${i <= step ? 'opacity-100' : 'opacity-30'}`}>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all ${
+                  i < step ? 'bg-green-500 text-white' : i === step ? 'bg-indigo-500 text-white' : 'bg-white/10 text-white/40'
+                }`}>
+                  {i < step ? '✓' : i + 1}
+                </div>
+                <span className={`text-sm ${i === step ? 'text-indigo-200 font-semibold' : 'text-indigo-300/60'}`}>{label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -241,7 +519,7 @@ const RegisterPage = () => {
             {stepContent[step]}
 
             <div className="flex gap-3 mt-8">
-              {step > 0 && (
+              {step > 0 && step < STEPS.length - 1 && (
                 <button
                   type="button"
                   onClick={handleBack}
@@ -254,15 +532,16 @@ const RegisterPage = () => {
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl transition text-sm shadow-lg shadow-indigo-900/40"
+                  disabled={step === 3 && !otpVerified}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition text-sm shadow-lg shadow-indigo-900/40"
                 >
-                  Continue →
+                  {step === 2 ? 'Send OTP & Continue →' : 'Continue →'}
                 </button>
               ) : (
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl transition text-sm shadow-lg shadow-indigo-900/40 disabled:opacity-60 flex items-center justify-center gap-2"
+                  disabled={loading || !otpVerified}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl transition text-sm shadow-lg shadow-indigo-900/40 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {loading ? (
                     <>
@@ -272,7 +551,7 @@ const RegisterPage = () => {
                       </svg>
                       Creating Account...
                     </>
-                  ) : '🛡️ Create Account'}
+                  ) : otpVerified ? '🛡️ Create Account' : '🔒 Verify phone first'}
                 </button>
               )}
             </div>

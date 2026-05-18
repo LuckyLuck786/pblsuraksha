@@ -302,16 +302,16 @@ const HotspotMapPage = () => {
                   }}
                 >
                   <Popup>
-                    <div className="text-sm min-w-[180px]">
-                      <p className="font-bold text-slate-800 border-b pb-1 mb-2 flex items-center gap-1">
-                        <span className={`w-2 h-2 rounded-full ${isHigh ? 'bg-red-500' : 'bg-orange-400'}`} />
+                    <div style={{ background: '#ffffff', color: '#1e293b', minWidth: '180px', fontSize: '13px' }}>
+                      <p style={{ fontWeight: 700, borderBottom: '1px solid #e2e8f0', paddingBottom: '6px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: isHigh ? '#dc2626' : '#f97316', display: 'inline-block' }} />
                         {isHigh ? '🔴 High Risk Zone' : '🟠 Medium Risk Zone'}
                       </p>
-                      <div className="space-y-1 text-slate-600">
-                        <p><span className="font-semibold">Incidents:</span> {spot.incident_count}</p>
-                        <p><span className="font-semibold">Avg Severity:</span> {spot.severity_avg}/10</p>
-                        <p><span className="font-semibold">Top Type:</span> {CATEGORY_ICONS[spot.top_category]} {spot.top_category?.replace('_', ' ')}</p>
-                        <p className="text-xs text-slate-400 capitalize">Risk: {spot.risk_level}</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', color: '#475569' }}>
+                        <p><strong style={{ color: '#1e293b' }}>Incidents:</strong> {spot.incident_count}</p>
+                        <p><strong style={{ color: '#1e293b' }}>Avg Severity:</strong> {spot.severity_avg}/10</p>
+                        <p><strong style={{ color: '#1e293b' }}>Top Type:</strong> {CATEGORY_ICONS[spot.top_category]} {spot.top_category?.replace('_', ' ')}</p>
+                        <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'capitalize' }}>Risk: {spot.risk_level}</p>
                       </div>
                     </div>
                   </Popup>
@@ -338,29 +338,28 @@ const HotspotMapPage = () => {
                   }}
                 >
                   <Popup>
-                    <div className="text-sm min-w-[220px]">
-                      <div className="flex items-start justify-between gap-2 border-b pb-2 mb-2">
+                    <div style={{ background: '#ffffff', color: '#1e293b', minWidth: '220px', fontSize: '13px' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', marginBottom: '8px' }}>
                         <div>
-                          <p className="font-bold text-slate-800 leading-tight">{pin.title}</p>
-                          <p className="text-xs text-slate-400 font-mono mt-0.5">{pin.complaint_id}</p>
+                          <p style={{ fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>{pin.title}</p>
+                          <p style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace', marginTop: '2px' }}>{pin.complaint_id}</p>
                         </div>
-                        <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
-                          style={{ background: pc.fill + '22', color: pc.fill }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '999px', flexShrink: 0, background: pc.fill + '22', color: pc.fill }}>
                           {pin.priority?.toUpperCase()}
                         </span>
                       </div>
-                      <div className="space-y-1 text-xs text-slate-600">
-                        <p>{CATEGORY_ICONS[pin.category]} <span className="capitalize">{pin.category?.replace('_', ' ')}</span></p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#475569' }}>
+                        <p>{CATEGORY_ICONS[pin.category]} <span style={{ textTransform: 'capitalize' }}>{pin.category?.replace('_', ' ')}</span></p>
                         <p>📍 {pin.location}</p>
-                        <p>⚡ Severity: <span className="font-semibold text-indigo-600">{pin.severity_score}/10</span></p>
-                        <p className="flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full" style={{ background: STATUS_COLORS[pin.status] }} />
+                        <p>⚡ Severity: <strong style={{ color: '#4f46e5' }}>{pin.severity_score}/10</strong></p>
+                        <p style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLORS[pin.status], display: 'inline-block' }} />
                           {pin.status?.replace('_', ' ')}
                         </p>
                         {pin.ai_summary && (
-                          <p className="italic text-blue-600 pt-1 border-t border-slate-100">{pin.ai_summary}</p>
+                          <p style={{ fontStyle: 'italic', color: '#2563eb', paddingTop: '4px', borderTop: '1px solid #f1f5f9' }}>{pin.ai_summary}</p>
                         )}
-                        <p className="text-slate-400 pt-1">{pin.created_at}</p>
+                        <p style={{ color: '#94a3b8', paddingTop: '2px' }}>{pin.created_at}</p>
                       </div>
                     </div>
                   </Popup>

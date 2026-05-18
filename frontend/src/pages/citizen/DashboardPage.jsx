@@ -47,7 +47,7 @@ const DashboardPage = () => {
             <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-xl p-6 mb-6 text-white">
                 <h1 className="text-2xl font-bold">Welcome back, {firstName}!</h1>
                 <p className="text-indigo-200 text-sm mt-1">
-                    Your complaints are being handled by SURAKSHA's AI-powered system.
+                    Your complaints are being handled by Safe City Connect's AI-powered system.
                 </p>
                 <Link
                     to="/citizen/complaint/new"

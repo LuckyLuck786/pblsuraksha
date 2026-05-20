@@ -1,7 +1,9 @@
-"""SURAKSHA - Intelligence Views"""
+"""Safe City Connect — Intelligence Views"""
 
 import logging
+from datetime import datetime
 
+from django.core.cache import cache
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -256,6 +258,18 @@ def llm_analytics(request):
         return Response({'error': 'Admin/authority access required.'}, status=403)
 
     sample_size = min(int(request.GET.get('sample', 24)), 300)
+    force_refresh = request.GET.get('force', '').lower() in ('1', 'true', 'yes')
+
+    # ── Return cached result if available (TTL 1 hour) ────────────────────
+    # LLM evaluation is slow (5-20 min on free-tier). Cache by sample_size so
+    # repeat page loads are instant. Pass ?force=1 to bypass and re-run.
+    cache_key = f'llm_analytics_v1_{sample_size}'
+    if not force_refresh:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            logger.info(f'llm_analytics: returning cached result (sample={sample_size}) for {request.user.username}')
+            return Response({**cached, 'from_cache': True})
+
     logger.info(f'llm_analytics: evaluation requested by {request.user.username}, sample={sample_size}')
 
     from .engine import analyze_all_llms
@@ -474,11 +488,14 @@ def llm_analytics(request):
         },
     }
 
-    return Response({
+    response_data = {
         'sample_size'     : len(eval_rows),
         'provider_metrics': provider_metrics,
         'paper_reference' : paper_reference,
         'categories'      : CATEGORIES,
-    })
+        'computed_at'     : datetime.now().isoformat(timespec='seconds'),
+    }
+    cache.set(cache_key, response_data, 3600)   # cache for 1 hour
+    return Response(response_data)
 
 

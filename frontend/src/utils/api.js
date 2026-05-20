@@ -153,7 +153,11 @@ export const intelligenceAPI = {
   getMapData        : ()                   => api.get('/intelligence/map-data/'),
   getInsights       : ()                   => api.get('/intelligence/insights/'),
   analyzeAll        : (title, description) => api.post('/intelligence/analyze-all/', { title, description }),
-  getLLMAnalytics   : (sample = 20)        => api.get(`/intelligence/llm-analytics/?sample=${sample}`, { timeout: 300000 }),
+  getLLMAnalytics   : (sample = 20, force = false) =>
+    api.get('/intelligence/llm-analytics/', {
+      params  : { sample, ...(force && { force: 1 }) },
+      timeout : 1500000,   // 25 min — free-tier LLMs are slow; use ?force=1 to bypass 1-hr cache
+    }),
 
   // ── New AI features ───────────────────────────────────────────────────
   checkDuplicate    : (title, description, incident_location) =>

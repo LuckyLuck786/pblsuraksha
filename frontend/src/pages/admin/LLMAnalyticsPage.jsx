@@ -418,15 +418,19 @@ export default function LLMAnalyticsPage() {
     const PROVIDER_KEYS   = ['groq-llama', 'groq-qwen', 'cerebras-gptoss', 'gemini', 'rule-based'];
     const SHOW_CATEGORIES = ['theft', 'assault', 'harassment', 'traffic', 'fraud', 'cybercrime', 'domestic', 'missing_person', 'drug_activity', 'vandalism', 'noise', 'other'];
 
-    const runEvaluation = async () => {
+    const runEvaluation = async (force = false) => {
         setLoading(true);
-        setData(null);
+        if (force) setData(null);
         try {
-            const res = await intelligenceAPI.getLLMAnalytics(sampleSize);
+            const res = await intelligenceAPI.getLLMAnalytics(sampleSize, force);
             setData(res.data);
-            toast.success(`Evaluation complete — ${res.data.sample_size} complaints analysed`);
+            const cached = res.data.from_cache;
+            toast.success(cached
+                ? `Cached result loaded — ${res.data.sample_size} complaints (computed ${new Date(res.data.computed_at).toLocaleTimeString()})`
+                : `Evaluation complete — ${res.data.sample_size} complaints analysed`
+            );
         } catch (err) {
-            const msg = err.response?.data?.error || 'Evaluation failed.';
+            const msg = err.response?.data?.error || 'Evaluation failed — the request timed out or the server errored. Try a smaller sample size (12).';
             toast.error(msg);
         } finally {
             setLoading(false);
@@ -460,8 +464,17 @@ export default function LLMAnalyticsPage() {
                             ))}
                         </select>
                     </div>
+                    {data?.from_cache && !loading && (
+                        <button
+                            onClick={() => runEvaluation(true)}
+                            className="text-xs text-gray-400 hover:text-gray-200 border border-gray-700 px-3 py-1.5 rounded-lg transition"
+                            title="Bypass cache and run a fresh evaluation (takes 5–20 min)"
+                        >
+                            ↺ Re-run
+                        </button>
+                    )}
                     <button
-                        onClick={runEvaluation}
+                        onClick={() => runEvaluation(false)}
                         disabled={loading}
                         className="flex items-center gap-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-xl transition"
                     >
@@ -474,7 +487,7 @@ export default function LLMAnalyticsPage() {
                                 Running…
                             </>
                         ) : (
-                            <>⚡ Run Evaluation</>
+                            <>⚡ {data?.from_cache ? 'Load Cached' : 'Run Evaluation'}</>
                         )}
                     </button>
                 </div>
@@ -508,17 +521,19 @@ export default function LLMAnalyticsPage() {
                         ))}
                     </div>
                     <div className="text-center space-y-1">
-                        <p className="text-gray-300 text-sm font-medium">Running parallel evaluation on {sampleSize} complaints…</p>
-                        <p className="text-gray-500 text-xs">3 Groq models × independent 12k TPM pools · per-model rate limiter (10/min each) · Rule-based runs instantly</p>
+                        <p className="text-gray-300 text-sm font-medium">Running evaluation on {sampleSize} complaints…</p>
+                        <p className="text-gray-500 text-xs">5 AI providers · free-tier rate limits apply · results cached for 1 hour after first run</p>
                         <p className="text-gray-600 text-xs mt-2">
                             {sampleSize <= 12
-                                ? `Estimated time: ~${Math.max(15, sampleSize * 4)}–${Math.max(30, sampleSize * 6)}s`
-                                : sampleSize <= 30
-                                ? `Estimated time: ~60–120s (${sampleSize * 3} Groq calls across 3 model pools, per-model rate-limited)`
-                                : `Estimated time: ~${Math.ceil((sampleSize * 3) / 30)}–${Math.ceil((sampleSize * 3) / 30) + 1} min (per-model RPM cap applies)`
+                                ? 'Estimated time: ~6–8 min (free-tier Groq/Cerebras: 4 RPM cap)'
+                                : sampleSize <= 24
+                                ? 'Estimated time: ~8–12 min (rate limiter pacing 5 providers)'
+                                : sampleSize <= 60
+                                ? `Estimated time: ~${Math.ceil(sampleSize / 5)}–${Math.ceil(sampleSize / 4)} min (${sampleSize * 5} total AI calls, rate-limited)`
+                                : `Estimated time: ~${Math.ceil(sampleSize / 4)}–${Math.ceil(sampleSize / 3)} min — consider using sample 12 or 24 instead`
                             }
-                            {sampleSize >= 50 ? ' — Gemini daily quota may also be exhausted' : ''}
                         </p>
+                        <p className="text-amber-500/70 text-xs mt-1">This page will stay open — do not navigate away</p>
                     </div>
                     <div className="w-48 bg-gray-700/40 rounded-full h-1 overflow-hidden">
                         <div className="h-full bg-rose-500 rounded-full animate-pulse" style={{ width: '60%' }} />
@@ -700,10 +715,17 @@ export default function LLMAnalyticsPage() {
                     <HonestReport data={data} sampleSize={sampleSize} />
 
                     {/* Footer note */}
-                    <p className="text-xs text-gray-600 text-center pb-4">
-                        Evaluated on {data.sample_size} most-recent complaints. Ground truth = stored category/severity from initial AI analysis.
-                        Paper values: MTIAE stress-test on 1,200 synthetic complaints (NCRB 2022 distribution, ICISCE 2025).
-                    </p>
+                    <div className="text-center pb-4 space-y-1">
+                        {data.from_cache && (
+                            <p className="text-xs text-blue-400/70">
+                                ⚡ Cached result — computed at {new Date(data.computed_at).toLocaleString()} · Click <strong>↺ Re-run</strong> to refresh
+                            </p>
+                        )}
+                        <p className="text-xs text-gray-600">
+                            Evaluated on {data.sample_size} complaints · ground truth = stored category/severity from initial AI analysis ·
+                            Paper: MTIAE stress-test on 1,200 synthetic complaints (NCRB 2022, ICISCE 2025)
+                        </p>
+                    </div>
                 </>
             )}
 

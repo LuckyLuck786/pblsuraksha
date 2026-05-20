@@ -4,3 +4,16 @@ rag_store/
 
 # Log files
 logs/*.log
+
+# Virtual environment
+.venv/
+
+# Claude files
+.claude/
+
+# macOS
+.DS_Store
+
+# Python cache
+__pycache__/
+*.pyc

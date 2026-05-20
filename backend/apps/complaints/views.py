@@ -26,6 +26,17 @@ from apps.intelligence.engine import categorize_complaint, compute_severity
 logger = logging.getLogger('apps.complaints')
 
 
+def api_error_response(message, status_code=status.HTTP_400_BAD_REQUEST, details=None):
+    payload = {
+        'status': 'error',
+        'status_code': status_code,
+        'message': message,
+    }
+    if details is not None:
+        payload['details'] = details
+    return Response(payload, status=status_code)
+
+
 class ComplaintListCreateView(generics.ListCreateAPIView):
     """
     GET  /api/complaints/         - List complaints (filtered by role)
@@ -184,17 +195,21 @@ def update_complaint_status(request, complaint_id):
     """
     if request.user.role not in ('authority', 'admin'):
         logger.warning(f'update_complaint_status: unauthorised by {request.user.username} on {complaint_id}')
-        return Response({'error': 'Permission denied.'}, status=403)
+        return api_error_response('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
 
     try:
         complaint = Complaint.objects.get(complaint_id=complaint_id)
     except Complaint.DoesNotExist:
         logger.warning(f'update_complaint_status: complaint {complaint_id} not found')
-        return Response({'error': 'Complaint not found.'}, status=404)
+        return api_error_response('Complaint not found.', status_code=status.HTTP_404_NOT_FOUND)
 
     serializer = ComplaintUpdateActionSerializer(data=request.data)
     if not serializer.is_valid():
-        return Response(serializer.errors, status=400)
+        return api_error_response(
+            'Invalid update request.',
+            status_code=status.HTTP_400_BAD_REQUEST,
+            details=serializer.errors,
+        )
 
     data = serializer.validated_data
     old_status = complaint.status
@@ -207,43 +222,79 @@ def update_complaint_status(request, complaint_id):
         complaint.authority_notes = data['authority_notes']
     if 'resolution_details' in data:
         complaint.resolution_details = data['resolution_details']
-    if data.get('assigned_to_id'):
+    assigned_to_id = data.get('assigned_to_id')
+    if assigned_to_id is not None:
         from apps.accounts.models import User
         try:
-            officer = User.objects.get(id=data['assigned_to_id'])
+            officer = User.objects.get(id=assigned_to_id)
             complaint.assigned_to = officer
         except User.DoesNotExist:
-            pass
+            logger.warning(
+                f'update_complaint_status: invalid officer id {assigned_to_id} for {complaint_id}'
+            )
+            return api_error_response(
+                'Assigned officer not found.',
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
     if data['status'] == 'resolved':
         complaint.resolved_at = timezone.now()
 
-    complaint.save()
+    try:
+        complaint.save()
+    except Exception as exc:
+        logger.error(
+            f'update_complaint_status: failed to save complaint {complaint_id}: {exc}',
+            exc_info=True
+        )
+        return api_error_response(
+            'Unable to update complaint due to a server error.',
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
     logger.info(
         f'Complaint {complaint_id} updated by {request.user.username}: '
         f'status {old_status}→{complaint.status}, priority={complaint.priority}'
     )
 
     # Create timeline update
-    update = ComplaintUpdate.objects.create(
-        complaint=complaint,
-        updated_by=request.user,
-        old_status=old_status,
-        new_status=data['status'],
-        message=data['message'],
-        is_public=True
-    )
+    try:
+        update = ComplaintUpdate.objects.create(
+            complaint=complaint,
+            updated_by=request.user,
+            old_status=old_status,
+            new_status=data['status'],
+            message=data['message'],
+            is_public=True
+        )
+    except Exception as exc:
+        logger.error(
+            f'update_complaint_status: failed to create update record for {complaint_id}: {exc}',
+            exc_info=True
+        )
+        return api_error_response(
+            'Complaint status changed, but timeline update failed.',
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
     # Notify the reporter
     if complaint.reporter:
-        Notification.objects.create(
-            user=complaint.reporter,
-            title=f'Complaint {complaint.complaint_id} Updated',
-            message=f'Status changed to: {complaint.get_status_display()}. {data["message"]}',
-            notif_type='complaint_update',
-            related_complaint=complaint
-        )
+        try:
+            Notification.objects.create(
+                user=complaint.reporter,
+                title=f'Complaint {complaint.complaint_id} Updated',
+                message=f'Status changed to: {complaint.get_status_display()}. {data["message"]}',
+                notif_type='complaint_update',
+                related_complaint=complaint
+            )
+        except Exception as exc:
+            logger.warning(
+                f'update_complaint_status: failed to notify reporter for {complaint_id}: {exc}',
+                exc_info=True
+            )
 
     return Response({
+        'status': 'ok',
         'message': 'Complaint updated successfully.',
         'complaint': ComplaintDetailSerializer(complaint, context={'request': request}).data
     })
@@ -261,16 +312,16 @@ def upload_evidence(request, complaint_id):
     try:
         complaint = Complaint.objects.get(complaint_id=complaint_id)
     except Complaint.DoesNotExist:
-        return Response({'error': 'Complaint not found.'}, status=404)
+        return api_error_response('Complaint not found.', status_code=status.HTTP_404_NOT_FOUND)
 
     # Only reporter or authority can upload
     user = request.user
     if user != complaint.reporter and user.role not in ('authority', 'admin'):
-        return Response({'error': 'Permission denied.'}, status=403)
+        return api_error_response('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
 
     files = request.FILES.getlist('files')
     if not files:
-        return Response({'error': 'No files provided.'}, status=400)
+        return api_error_response('No files provided.', status_code=status.HTTP_400_BAD_REQUEST)
 
     ALLOWED_TYPES = [
         'image/jpeg', 'image/png', 'image/gif', 'image/webp',

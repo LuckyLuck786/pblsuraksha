@@ -1,6 +1,6 @@
-# SURAKSHA — AI-Powered Public Safety Intelligence Platform
+# SAFECITY CONNECT — AI-Powered Public Safety Intelligence Platform
 
-> *SURAKSHA* (Sanskrit: सुरक्षा — *protection*) is a full-stack research prototype that demonstrates a
+> * SAFECITY CONNECT*  is a full-stack research prototype that demonstrates a
 > **Multi-Tier Intelligent Analysis Engine (MTIAE)** for automated classification, prioritisation,
 > and routing of public safety complaints using multiple large language models operating in parallel.
 >
@@ -87,7 +87,7 @@ The platform's research contribution is the MTIAE framework — a multi-provider
 │               (Create React App + Tailwind CSS)                │
 │                                                                │
 │  ┌──────────────────────┐  ┌──────────────────────────────┐    │
-│  │   Citizen Pages       │  │  Admin / Authority Pages     │    │
+│  │   Citizen Pages      │  │  Admin / Authority Pages     │    │
 │  │  Dashboard · Submit  │  │  Complaints · Analytics      │    │
 │  │  My Cases · Notifs   │  │  Users · Hotspot Map         │    │
 │  │                      │  │  LLM Analytics Dashboard     │    │
@@ -99,19 +99,19 @@ The platform's research contribution is the MTIAE framework — a multi-provider
 └───────────────────────────┬────────────────────────────────────┘
                             │  REST/JSON  ·  JWT Bearer Token
 ┌───────────────────────────▼────────────────────────────────────┐
-│                 DJANGO REST FRAMEWORK  BACKEND                  │
+│                 DJANGO REST FRAMEWORK  BACKEND                 │
 │                                                                │
 │  ┌──────────────┐   ┌───────────────┐   ┌───────────────────┐  │
-│  │ accounts app  │   │ complaints app│   │ intelligence app  │  │
+│  │ accounts app │   │ complaints app│   │ intelligence app  │  │
 │  │              │   │               │   │                   │  │
 │  │ User model   │   │ Complaint     │   │  engine.py        │  │
 │  │ JWT auth     │   │ Evidence      │   │  ┌─────────────┐  │  │
 │  │ Registration │   │ Update        │   │  │ Rate Limiter│  │  │
 │  │ Profile      │   │ Notification  │   │  │ per-model   │  │  │
 │  └──────────────┘   └───────────────┘   │  └──────┬──────┘  │  │
-│                                         │         │parallel  │  │
-│                                         └─────────┼──────────┘  │
-└─────────────────────────────────────────────────┼───────────────┘
+│                                         │         │parallel │  │
+│                                         └─────────┼─────────┘  │
+└─────────────────────────────────────────────────┼──────────────┘
                           Parallel HTTPS calls    │
           ┌──────────┬──────────┬──────────┬──────────┘
           ▼          ▼          ▼          ▼
@@ -145,20 +145,20 @@ The platform's research contribution is the MTIAE framework — a multi-provider
 
 ### Backend
 
-| Package | Version | Role |
-|---------|---------|------|
-| Django | 4.2.7 | Web framework, ORM, admin interface |
-| djangorestframework | 3.14.0 | REST API serializers, viewsets, pagination |
-| djangorestframework-simplejwt | 5.5.1 | JWT access tokens (24 h) + refresh tokens (7 days) |
-| django-cors-headers | 4.3.1 | CORS allow-list for React dev server (`localhost:3000`) |
-| Pillow | ≥11.0.0 | User avatar `ImageField` |
-| groq | ≥0.9.0 | Official Groq Python SDK (Llama + Qwen) |
-| cerebras-cloud-sdk | ≥1.67.0 | Official Cerebras Python SDK (GPT-OSS-120b) |
-| google-genai | ≥2.0.0 | Official Google Generative AI Python SDK |
-| python-decouple | 3.8 | `.env` variable loading with type coercion |
-| psycopg2-binary | ≥2.9.9 | PostgreSQL driver (production path) |
-| gunicorn | 21.2.0 | WSGI production server |
-| openpyxl | ≥3.1.0 | Excel import for the 300-case research dataset |
+| Package                       | Version | Role                                                   |
+|-------------------------------|---------|--------------------------------------------------------|
+| Django                        | 4.2.7   | Web framework, ORM, admin interface                    |
+| djangorestframework           | 3.14.0  | REST API serializers, viewsets, pagination             |
+| djangorestframework-simplejwt | 5.5.1   | JWT access tokens (24 h) + refresh tokens (7 days)     |
+| django-cors-headers           | 4.3.1   | CORS allow-list for React dev server (`localhost:3000`)|
+| Pillow                        | ≥11.0.0 | User avatar `ImageField`                               |
+| groq                          | ≥0.9.0  | Official Groq Python SDK (Llama + Qwen)                |
+| cerebras-cloud-sdk            | ≥1.67.0 | Official Cerebras Python SDK (GPT-OSS-120b)            |
+| google-genai                  | ≥2.0.0  | Official Google Generative AI Python SDK               |
+| python-decouple               | 3.8     | `.env` variable loading with type coercion             |
+| psycopg2-binary               | ≥2.9.9  | PostgreSQL driver (production path)                    |
+| gunicorn                      | 21.2.0  | WSGI production server                                 |
+| openpyxl                      | ≥3.1.0  | Excel import for the 300-case research dataset         |
 
 ### Frontend
 

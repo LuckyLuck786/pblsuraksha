@@ -20,10 +20,6 @@ urlpatterns = [
     path('users/',                    views.UserListView.as_view(), name='user-list'),
     path('users/<int:pk>/manage/',    views.manage_user,            name='manage-user'),
 
-    # ── Phone OTP verification ───────────────────────────────────────────────
-    path('send-otp/',    views.send_phone_otp,   name='send_otp'),
-    path('verify-otp/',  views.verify_phone_otp, name='verify_otp'),
-
     # ── Email verification ───────────────────────────────────────────────────
     path('send-email-verification/', views.send_email_verification, name='send_email_verification'),
     path('verify-email/',            views.verify_email_token,      name='verify_email'),

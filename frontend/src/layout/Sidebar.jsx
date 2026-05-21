@@ -142,16 +142,28 @@ const getMenuItems = (role) => {
     { label: 'Notifications', path: '/citizen/notifications', icon: ICONS.bell },
   ];
 
-  if (role === 'authority' || role === 'admin') return [
+  // Authority officers — no access to user management or LLM analytics
+  if (role === 'authority') return [
     ...common,
-    { label: 'All Complaints', path: '/admin/complaints', icon: ICONS.list },
-    { label: 'Crime Hotspots', path: '/admin/hotspots', icon: ICONS.map },
-    { label: 'Predicted Hotspots', path: '/admin/predicted-hotspots', icon: ICONS.shield },
-    { label: 'Analytics', path: '/admin/analytics', icon: ICONS.chart },
-    { label: 'Crime Trends', path: '/admin/trends', icon: ICONS.trend },
-    { label: 'NL Query', path: '/admin/nl-query', icon: ICONS.search },
-    { label: 'Users', path: '/admin/users', icon: ICONS.users },
-    { label: 'LLM Analytics', path: '/admin/llm-analytics', icon: ICONS.brain },
+    { label: 'All Complaints',    path: '/admin/complaints',         icon: ICONS.list   },
+    { label: 'Crime Hotspots',    path: '/admin/hotspots',           icon: ICONS.map    },
+    { label: 'Predicted Hotspots',path: '/admin/predicted-hotspots', icon: ICONS.shield },
+    { label: 'Analytics',         path: '/admin/analytics',          icon: ICONS.chart  },
+    { label: 'Crime Trends',      path: '/admin/trends',             icon: ICONS.trend  },
+    { label: 'NL Query',          path: '/admin/nl-query',           icon: ICONS.search },
+  ];
+
+  // Admin — full access including user management and LLM analytics
+  if (role === 'admin') return [
+    ...common,
+    { label: 'All Complaints',    path: '/admin/complaints',         icon: ICONS.list   },
+    { label: 'Crime Hotspots',    path: '/admin/hotspots',           icon: ICONS.map    },
+    { label: 'Predicted Hotspots',path: '/admin/predicted-hotspots', icon: ICONS.shield },
+    { label: 'Analytics',         path: '/admin/analytics',          icon: ICONS.chart  },
+    { label: 'Crime Trends',      path: '/admin/trends',             icon: ICONS.trend  },
+    { label: 'NL Query',          path: '/admin/nl-query',           icon: ICONS.search },
+    { label: 'Users',             path: '/admin/users',              icon: ICONS.users  },
+    { label: 'LLM Analytics',     path: '/admin/llm-analytics',      icon: ICONS.brain  },
   ];
 
   return common;

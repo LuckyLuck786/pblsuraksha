@@ -70,13 +70,8 @@ const AdminUsersPage = () => {
         try {
             const res = await authAPI.manageUser(userId, action);
             toast.success(res.data.message);
-            if (action === 'delete') {
-                setUsers(prev => prev.filter(u => u.id !== userId));
-            } else {
-                setUsers(prev => prev.map(u =>
-                    u.id === userId ? { ...u, is_active: action === 'unblock' } : u
-                ));
-            }
+            // Always refresh from server so the list reflects true state
+            await fetchUsers();
         } catch (err) {
             toast.error(err.response?.data?.error || 'Action failed.');
         } finally {

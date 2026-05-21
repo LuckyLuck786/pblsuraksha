@@ -449,13 +449,14 @@ def mark_notifications_read(request):
 @permission_classes([IsAuthenticated])
 def export_complaints(request):
     """
-    GET /api/complaints/export/?format=xlsx&status=pending&priority=critical
+    GET /api/complaints/export/?export_format=xlsx&status=pending&priority=critical
     Export filtered complaints to Excel or PDF.
+    Note: uses 'export_format' (not 'format') to avoid clash with DRF's URL_FORMAT_OVERRIDE.
     """
     if request.user.role not in ('admin', 'authority'):
         return Response({'error': 'Authority access required.'}, status=403)
 
-    fmt      = request.GET.get('format', 'xlsx').lower()
+    fmt      = request.GET.get('export_format', 'xlsx').lower()
     qs       = Complaint.objects.all()
     status_f = request.GET.get('status')
     priority_f = request.GET.get('priority')

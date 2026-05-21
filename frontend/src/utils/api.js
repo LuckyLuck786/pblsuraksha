@@ -111,10 +111,6 @@ export const authAPI = {
   updateProfile      : (data) => api.patch('/auth/profile/', data),
   getDashboardStats  : ()     => api.get('/auth/dashboard-stats/'),
 
-  // ── Phone OTP verification ─────────────────────────────────────────────
-  sendOtp            : (phone) => api.post('/auth/send-otp/', { phone }),
-  verifyOtp          : (phone, otp_code) => api.post('/auth/verify-otp/', { phone, otp_code }),
-
   // ── Email verification ─────────────────────────────────────────────────
   sendEmailVerification: ()      => api.post('/auth/send-email-verification/'),
   verifyEmail          : (token) => api.post('/auth/verify-email/', { token }),
@@ -140,7 +136,7 @@ export const complaintsAPI = {
 
   // ── Export ────────────────────────────────────────────────────────────
   exportComplaints    : (format = 'xlsx', params = {}) =>
-    api.get('/complaints/export/', { params: { format, ...params }, responseType: 'blob' }),
+    api.get('/complaints/export/', { params: { export_format: format, ...params }, responseType: 'blob' }),
 
   // ── Anonymous Tip ─────────────────────────────────────────────────────
   submitAnonymousTip  : (data) => api.post('/complaints/anonymous-tip/', data),

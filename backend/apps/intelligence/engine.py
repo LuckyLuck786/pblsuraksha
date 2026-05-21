@@ -957,81 +957,382 @@ For each zone, predict next-week risk level and category. Respond ONLY with vali
 
 
 def natural_language_query(question: str) -> dict:
-    """
-    Convert a natural language question about crime data into an answer.
-    Uses LLM to interpret the question, executes safe aggregation queries.
-    Returns: {question, answer, data, query_type}
-    """
+    """Legacy single-shot wrapper — routes to chatbot_query with empty history."""
+    result = chatbot_query(question, [])
+    return {"question": question, "answer": result.get("answer", ""), "data": {}, "query_type": "chat"}
+
+
+# ── Tool implementations (called by the agent loop) ────────────────────────
+
+def _tool_get_complaint_by_id(complaint_id: str) -> dict:
+    """Fetch full details of one complaint by its SRK-style ID."""
+    from apps.complaints.models import Complaint
+    try:
+        c = Complaint.objects.get(complaint_id=complaint_id.strip().upper())
+        return {
+            "found": True,
+            "complaint_id": c.complaint_id,
+            "title": c.title,
+            "description": c.description,
+            "category": c.category,
+            "priority": c.priority,
+            "status": c.status,
+            "severity_score": float(c.severity_score or 0),
+            "incident_location": c.incident_location or "",
+            "reporter": c.reporter.username if c.reporter else "Anonymous",
+            "ipc_sections": getattr(c, 'ipc_sections', []) or [],
+            "ai_summary": getattr(c, 'ai_summary', '') or '',
+            "created_at": c.created_at.strftime('%d %b %Y %H:%M') if c.created_at else '',
+            "updated_at": c.updated_at.strftime('%d %b %Y %H:%M') if getattr(c, 'updated_at', None) else '',
+        }
+    except Exception:
+        # Try case-insensitive search
+        from apps.complaints.models import Complaint
+        qs = Complaint.objects.filter(complaint_id__iexact=complaint_id.strip())
+        if qs.exists():
+            c = qs.first()
+            return {
+                "found": True,
+                "complaint_id": c.complaint_id,
+                "title": c.title,
+                "description": c.description,
+                "category": c.category,
+                "priority": c.priority,
+                "status": c.status,
+                "severity_score": float(c.severity_score or 0),
+                "incident_location": c.incident_location or "",
+                "reporter": c.reporter.username if c.reporter else "Anonymous",
+                "ipc_sections": getattr(c, 'ipc_sections', []) or [],
+                "ai_summary": getattr(c, 'ai_summary', '') or '',
+                "created_at": c.created_at.strftime('%d %b %Y %H:%M') if c.created_at else '',
+            }
+        return {"found": False, "complaint_id": complaint_id, "error": f"No complaint found with ID '{complaint_id}'"}
+
+
+def _tool_search_complaints(category=None, priority=None, status=None,
+                             location_keyword=None, days=None, limit=10) -> dict:
+    """Filter complaints by various criteria and return a list."""
+    from apps.complaints.models import Complaint
+    from django.utils import timezone
+    from datetime import timedelta
+    from django.db.models import Avg
+
+    try:
+        qs = Complaint.objects.all()
+        if category:
+            qs = qs.filter(category=category)
+        if priority:
+            qs = qs.filter(priority=priority)
+        if status:
+            qs = qs.filter(status=status)
+        if location_keyword:
+            qs = qs.filter(incident_location__icontains=location_keyword)
+        if days:
+            qs = qs.filter(created_at__gte=timezone.now() - timedelta(days=int(days)))
+
+        limit = min(int(limit or 10), 50)
+        total = qs.count()
+        avg_severity = qs.aggregate(avg=Avg('severity_score'))['avg']
+        results = []
+        for c in qs.order_by('-created_at')[:limit]:
+            results.append({
+                "complaint_id": c.complaint_id,
+                "title": c.title[:80],
+                "category": c.category,
+                "priority": c.priority,
+                "status": c.status,
+                "severity_score": float(c.severity_score or 0),
+                "incident_location": c.incident_location or "",
+                "created_at": c.created_at.strftime('%d %b %Y') if c.created_at else '',
+            })
+        return {
+            "total_matching": total,
+            "showing": len(results),
+            "avg_severity": round(avg_severity or 0, 2),
+            "complaints": results,
+        }
+    except Exception as e:
+        return {"error": str(e), "complaints": []}
+
+
+def _tool_get_database_stats() -> dict:
+    """Return overall statistics about the complaints database."""
     from apps.complaints.models import Complaint
     from django.db.models import Count, Avg
     from django.utils import timezone
     from datetime import timedelta
 
-    # Parse the question to determine query type
-    prompt = f"""You are a crime data query interpreter for Safe City Connect platform.
+    try:
+        total = Complaint.objects.count()
+        by_status   = {r['status']:   r['count'] for r in
+                       Complaint.objects.values('status').annotate(count=Count('id'))}
+        by_priority = {r['priority']: r['count'] for r in
+                       Complaint.objects.values('priority').annotate(count=Count('id'))}
+        by_category = list(Complaint.objects.values('category')
+                           .annotate(count=Count('id')).order_by('-count'))
+        avg_sev = Complaint.objects.aggregate(avg=Avg('severity_score'))['avg']
+        last_7d = Complaint.objects.filter(
+            created_at__gte=timezone.now() - timedelta(days=7)).count()
+        last_30d = Complaint.objects.filter(
+            created_at__gte=timezone.now() - timedelta(days=30)).count()
+        return {
+            "total_complaints": total,
+            "last_7_days": last_7d,
+            "last_30_days": last_30d,
+            "by_status": by_status,
+            "by_priority": by_priority,
+            "top_categories": by_category[:6],
+            "avg_severity_score": round(avg_sev or 0, 2),
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
-The database has complaints with these fields:
-- category: theft|assault|harassment|traffic|fraud|cybercrime|domestic|missing_person|drug_activity|vandalism|noise|other
-- priority: low|medium|high|critical
-- status: pending|acknowledged|in_progress|resolved|closed|rejected
-- incident_location: text (Bangalore area names)
-- created_at: datetime
-- severity_score: 0-10 float
 
-User question: "{question}"
+# ── Groq tool definitions (no enum constraints — avoids llama XML-format bug) ──
 
-Determine the query type and parameters. Respond ONLY with valid JSON:
-{{
-  "query_type": "count|top_category|by_status|by_priority|by_location|trend|severity|recent",
-  "filters": {{"category": null, "priority": null, "status": null, "days": 30, "location_keyword": null}},
-  "answer_template": "There were {{count}} theft complaints in the last 30 days."
-}}"""
+_CHATBOT_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_complaint_by_id",
+            "description": "Fetch full details of a complaint by its ID (e.g. SRK8533482). Call this whenever a specific case ID is mentioned.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "complaint_id": {"type": "string", "description": "Complaint ID like SRK8533482"}
+                },
+                "required": ["complaint_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_complaints",
+            "description": "Search complaints with optional filters. All parameters are optional.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "category":         {"type": "string",  "description": "Crime category: theft, assault, harassment, traffic, fraud, cybercrime, domestic, missing_person, drug_activity, vandalism, noise, other"},
+                    "priority":         {"type": "string",  "description": "Priority: low, medium, high, critical"},
+                    "status":           {"type": "string",  "description": "Status: pending, acknowledged, in_progress, resolved, closed, rejected"},
+                    "location_keyword": {"type": "string",  "description": "Partial location name, e.g. JP Nagar"},
+                    "days":             {"type": "integer", "description": "Only last N days"},
+                    "limit":            {"type": "integer", "description": "Max results (default 10)"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_database_stats",
+            "description": "Get platform-wide statistics: totals by status, priority, category, and recent activity.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+]
 
-    meta = _analyze_raw_gemini(prompt)
-    if not meta:
-        return {"question": question, "answer": "Could not interpret the question.", "data": {}, "query_type": "unknown"}
+# Kept short intentionally — long system prompts cause llama to emit XML tool calls instead of JSON
+_CHATBOT_SYSTEM_PROMPT = """You are SURAKSHA, a crime intelligence assistant for Safe City Connect (Bangalore).
+You help officers investigate cases, query crime data, and apply Indian criminal law.
 
-    filters = meta.get('filters', {})
-    query_type = meta.get('query_type', 'count')
+Use tools to fetch real data before answering. Never fabricate case details or statistics.
+
+Key IPC sections: 302 murder, 304A negligent death, 307 attempt murder, 354 outraging modesty, 363 kidnapping, 376 rape, 379 theft, 392 robbery, 420 fraud/cheating, 498A domestic cruelty, 503/506 criminal intimidation. IT Act 66 hacking, 66C identity theft, 66D online fraud. NDPS for drugs. POCSO for child offences.
+
+After IPC recommendations always add: ⚠️ Verify with a qualified legal officer for official proceedings.
+Answer concisely with bullet points. Remember conversation context for follow-up questions."""
+
+
+def _chatbot_context_fallback(question: str, conversation_history: list, client, tools_used: list) -> dict:
+    """
+    Fallback when native tool calling fails (Groq 400 / XML-format bug).
+    Proactively fetches relevant data based on question keywords, stuffs it
+    into context, then calls Groq once with no tools for a plain text answer.
+    """
+    import re as _re
+
+    context_parts = []
+
+    # 1. Always include stats (one fast DB query)
+    stats = _tool_get_database_stats()
+    context_parts.append(f"PLATFORM STATS:\n{json.dumps(stats, default=str)}")
+    tools_used.append('get_database_stats')
+
+    # 2. Extract complaint IDs from question + recent history
+    all_text = question + ' '.join(
+        str(m.get('content', '')) for m in (conversation_history or [])[-6:]
+    )
+    ids_found = list(set(_re.findall(r'SRK\d+', all_text.upper())))
+    for cid in ids_found[:3]:
+        detail = _tool_get_complaint_by_id(cid)
+        context_parts.append(f"CASE {cid}:\n{json.dumps(detail, default=str)}")
+        tools_used.append('get_complaint_by_id')
+
+    # 3. Smart keyword search if no specific ID and question implies a list
+    if not ids_found:
+        q_lower = question.lower()
+        cat_map = {
+            'fraud': 'fraud', 'theft': 'theft', 'assault': 'assault',
+            'harassment': 'harassment', 'traffic': 'traffic', 'cybercrime': 'cybercrime',
+            'domestic': 'domestic', 'missing': 'missing_person', 'drug': 'drug_activity',
+            'vandalism': 'vandalism', 'noise': 'noise',
+        }
+        pri_map = {'critical': 'critical', 'high': 'high', 'medium': 'medium', 'low': 'low'}
+        sta_map = {'pending': 'pending', 'resolved': 'resolved', 'in_progress': 'in_progress',
+                   'acknowledged': 'acknowledged', 'closed': 'closed'}
+
+        category = next((v for k, v in cat_map.items() if k in q_lower), None)
+        priority = next((v for k, v in pri_map.items() if k in q_lower), None)
+        status   = next((v for k, v in sta_map.items() if k in q_lower), None)
+        need_search = any(kw in q_lower for kw in [
+            'show', 'list', 'latest', 'recent', 'case', 'cases', 'complaint',
+            'find', 'which', 'give me', 'what are', 'unresolved', 'open',
+        ])
+        if need_search or category or priority or status:
+            limit = 10
+            if any(kw in q_lower for kw in ['5', 'five', 'top 5', 'last 5']): limit = 5
+            if any(kw in q_lower for kw in ['3', 'three', 'top 3']): limit = 3
+            results = _tool_search_complaints(
+                category=category, priority=priority, status=status, limit=limit
+            )
+            context_parts.append(f"SEARCH RESULTS:\n{json.dumps(results, default=str)}")
+            tools_used.append('search_complaints')
+
+    context_block = '\n\n'.join(context_parts)
+    system_with_data = (
+        _CHATBOT_SYSTEM_PROMPT
+        + f"\n\n=== LIVE DATA FROM DATABASE ===\n{context_block[:5000]}\n=== END DATA ===\n"
+        + "\nAnswer the user's question using ONLY the data provided above. Do not guess or invent details."
+    )
+
+    messages = [{"role": "system", "content": system_with_data}]
+    for msg in (conversation_history or []):
+        if isinstance(msg, dict) and msg.get('role') in ('user', 'assistant') and msg.get('content'):
+            messages.append({"role": msg['role'], "content": str(msg['content'])})
+    messages.append({"role": "user", "content": question})
 
     try:
-        qs = Complaint.objects.all()
-        days = int(filters.get('days') or 30)
-        qs = qs.filter(created_at__gte=timezone.now() - timedelta(days=days))
-
-        if filters.get('category'):
-            qs = qs.filter(category=filters['category'])
-        if filters.get('priority'):
-            qs = qs.filter(priority=filters['priority'])
-        if filters.get('status'):
-            qs = qs.filter(status=filters['status'])
-        if filters.get('location_keyword'):
-            qs = qs.filter(incident_location__icontains=filters['location_keyword'])
-
-        data = {}
-        if query_type == 'top_category':
-            results = list(qs.values('category').annotate(count=Count('id')).order_by('-count')[:5])
-            data = {'top_categories': results}
-            answer = "Top categories: " + ", ".join(f"{r['category']} ({r['count']})" for r in results[:3])
-        elif query_type == 'by_status':
-            results = list(qs.values('status').annotate(count=Count('id')).order_by('-count'))
-            data = {'by_status': results}
-            answer = ", ".join(f"{r['status']}: {r['count']}" for r in results)
-        elif query_type == 'severity':
-            avg = qs.aggregate(avg=Avg('severity_score'))['avg']
-            data = {'avg_severity': round(avg or 0, 2)}
-            answer = f"Average severity score: {data['avg_severity']}/10"
-        else:
-            count = qs.count()
-            data = {'count': count}
-            answer = meta.get('answer_template', f"Found {count} matching complaints.").replace('{count}', str(count))
-
-        logger.info(f'NL query answered: "{question}" → {query_type}')
-        return {"question": question, "answer": answer, "data": data, "query_type": query_type}
-
+        _GroqRateLimiter.wait(GROQ_MODEL_LLAMA)
+        response = client.chat.completions.create(
+            model=GROQ_MODEL_LLAMA,
+            messages=messages,
+            temperature=0.2,
+            max_tokens=1200,
+        )
+        answer = response.choices[0].message.content or "Could not generate a response."
+        logger.info(f'chatbot_query fallback: answered. tools_used={tools_used}')
+        return {"answer": answer, "tools_used": tools_used}
     except Exception as e:
-        logger.warning(f'NL query execution failed: {e}')
-        return {"question": question, "answer": "Could not execute query.", "data": {}, "query_type": "error"}
+        logger.warning(f'chatbot_query fallback also failed: {e}')
+        return {"answer": "AI service is temporarily unavailable. Please try again in a moment.", "tools_used": tools_used}
+
+
+def chatbot_query(question: str, conversation_history: list) -> dict:
+    """
+    Agent-based NL chatbot for crime data.
+
+    Primary path: Groq llama-3.3-70b-versatile with native tool calling
+    (agent loop, up to 4 iterations).
+
+    Fallback path: if Groq returns a 400 tool_use_failed error (known issue
+    with long prompts causing the model to emit XML-style calls), we proactively
+    fetch relevant data via keyword matching and call Groq once with data
+    stuffed into the system prompt — no tools needed.
+
+    Args:
+        question: the user's current message
+        conversation_history: list of {role, content} dicts from prior turns
+
+    Returns:
+        {"answer": str, "tools_used": list[str]}
+    """
+    try:
+        from groq import Groq
+    except ImportError:
+        logger.error('chatbot_query: groq package not installed.')
+        return {"answer": "AI service unavailable — groq package missing.", "tools_used": []}
+
+    groq_key = getattr(settings, 'GROQ_API_KEY_1', '')
+    if not groq_key:
+        return {"answer": "AI service not configured.", "tools_used": []}
+
+    client = Groq(api_key=groq_key)
+
+    # Build initial message list
+    messages = [{"role": "system", "content": _CHATBOT_SYSTEM_PROMPT}]
+    for msg in (conversation_history or []):
+        if isinstance(msg, dict) and msg.get('role') in ('user', 'assistant') and msg.get('content'):
+            messages.append({"role": msg['role'], "content": str(msg['content'])})
+    messages.append({"role": "user", "content": question})
+
+    tools_used = []
+    MAX_ITERATIONS = 4
+
+    for iteration in range(MAX_ITERATIONS):
+        try:
+            _GroqRateLimiter.wait(GROQ_MODEL_LLAMA)
+            response = client.chat.completions.create(
+                model=GROQ_MODEL_LLAMA,
+                messages=messages,
+                tools=_CHATBOT_TOOLS,
+                tool_choice="auto",
+                temperature=0.2,
+                max_tokens=1500,
+            )
+        except Exception as e:
+            err_str = str(e)
+            # 400 tool_use_failed → model emitted XML-format calls; use fallback
+            if '400' in err_str and ('tool_use_failed' in err_str or 'Failed to call' in err_str):
+                logger.warning('chatbot_query: tool_use_failed (XML-format bug) — switching to context-stuffing fallback.')
+                return _chatbot_context_fallback(question, conversation_history, client, tools_used)
+            logger.warning(f'chatbot_query: Groq API error on iteration {iteration}: {e}')
+            return {"answer": "I'm having trouble connecting right now. Please try again.", "tools_used": tools_used}
+
+        choice  = response.choices[0]
+        msg_obj = choice.message
+
+        # No tool calls → final answer
+        if not msg_obj.tool_calls:
+            answer = msg_obj.content or "I couldn't generate a response. Please rephrase."
+            logger.info(f'chatbot_query: answered after {iteration + 1} iteration(s). tools={tools_used}')
+            return {"answer": answer, "tools_used": tools_used}
+
+        # Tool calls → execute, append results, loop
+        messages.append(msg_obj)
+        for tool_call in msg_obj.tool_calls:
+            fn_name = tool_call.function.name
+            try:
+                fn_args = json.loads(tool_call.function.arguments or '{}')
+            except json.JSONDecodeError:
+                fn_args = {}
+
+            tools_used.append(fn_name)
+            logger.info(f'chatbot_query: tool {fn_name}({fn_args})')
+
+            if fn_name == 'get_complaint_by_id':
+                result = _tool_get_complaint_by_id(fn_args.get('complaint_id', ''))
+            elif fn_name == 'search_complaints':
+                result = _tool_search_complaints(**{
+                    k: fn_args[k] for k in
+                    ['category', 'priority', 'status', 'location_keyword', 'days', 'limit']
+                    if k in fn_args
+                })
+            elif fn_name == 'get_database_stats':
+                result = _tool_get_database_stats()
+            else:
+                result = {"error": f"Unknown tool: {fn_name}"}
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": json.dumps(result, default=str),
+            })
+
+    logger.warning('chatbot_query: hit MAX_ITERATIONS — using context fallback.')
+    return _chatbot_context_fallback(question, conversation_history, client, tools_used)
 
 
 def get_crime_trends(days: int = 90) -> dict:

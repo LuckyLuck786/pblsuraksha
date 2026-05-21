@@ -162,7 +162,8 @@ export const intelligenceAPI = {
   investigationSummary: (complaintId) =>
     api.post(`/intelligence/investigation-summary/${complaintId}/`),
 
-  nlQuery           : (question) => api.post('/intelligence/nl-query/', { question }),
+  nlQuery           : (question, conversationHistory = []) =>
+    api.post('/intelligence/nl-query/', { question, conversation_history: conversationHistory }),
 
   getCrimeTrends    : (days = 90) => api.get(`/intelligence/trends/?days=${days}`),
 

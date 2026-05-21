@@ -200,14 +200,29 @@ def investigation_summary(request, complaint_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def nl_query(request):
-    """POST /api/intelligence/nl-query/ — Natural language crime data query."""
+    """
+    POST /api/intelligence/nl-query/
+    Agent-based crime intelligence chatbot with tool use and conversation memory.
+
+    Request body:
+      { "question": "...", "conversation_history": [{role, content}, ...] }
+
+    Returns:
+      { "answer": "...", "tools_used": [...] }
+    """
     if request.user.role not in ('admin', 'authority'):
         return Response({'error': 'Authority access required.'}, status=403)
+
     question = request.data.get('question', '').strip()
     if not question:
         return Response({'error': 'Question required'}, status=400)
-    from .engine import natural_language_query
-    result = natural_language_query(question)
+
+    conversation_history = request.data.get('conversation_history', [])
+    if not isinstance(conversation_history, list):
+        conversation_history = []
+
+    from .engine import chatbot_query
+    result = chatbot_query(question, conversation_history)
     return Response(result)
 
 

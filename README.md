@@ -162,18 +162,18 @@ The platform's research contribution is the MTIAE framework — a multi-provider
 
 ### Frontend
 
-| Package | Version | Role |
-|---------|---------|------|
-| React / ReactDOM | 18.2.0 | UI component framework |
-| react-router-dom | 6.20.0 | Client-side routing with `ProtectedRoute` and role redirects |
-| axios | 1.6.2 | HTTP client with request/response interceptors |
-| leaflet + react-leaflet | 1.9.4 / 4.2.1 | Interactive crime hotspot map |
-| recharts | 2.9.3 | Bar, pie, and line charts for analytics dashboards |
-| react-hot-toast | 2.4.1 | Toast notifications |
-| react-dropzone | 14.2.3 | Evidence file upload with drag-and-drop |
-| framer-motion | 10.16.4 | Page transition animations |
-| tailwindcss | 3.4.19 | Utility-first CSS with dark-mode support |
-| date-fns | 2.30.0 | Date formatting and relative time display |
+| Package                 | Version       | Role.                                                        |
+|-------------------------|---------------|--------------------------------------------------------------|
+| React / ReactDOM        | 18.2.0        | UI component framework                                       |
+| react-router-dom        | 6.20.0        | Client-side routing with `ProtectedRoute` and role redirects |
+| axios                   | 1.6.2         | HTTP client with request/response interceptors               |
+| leaflet + react-leaflet | 1.9.4 / 4.2.1 | Interactive crime hotspot map                                |
+| recharts                | 2.9.3         | Bar, pie, and line charts for analytics dashboards           |
+| react-hot-toast         | 2.4.1         | Toast notifications                                          |
+| react-dropzone.         | 14.2.3        | Evidence file upload with drag-and-drop                      |
+| framer-motion           | 10.16.4       | Page transition animations                                   |
+| tailwindcss             | 3.4.19        | Utility-first CSS with dark-mode support                     |
+| date-fns                | 2.30.0        | Date formatting and relative time display                    |
 
 ---
 

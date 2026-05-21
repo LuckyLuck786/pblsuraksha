@@ -150,7 +150,7 @@ const getMenuItems = (role) => {
     { label: 'Predicted Hotspots',path: '/admin/predicted-hotspots', icon: ICONS.shield },
     { label: 'Analytics',         path: '/admin/analytics',          icon: ICONS.chart  },
     { label: 'Crime Trends',      path: '/admin/trends',             icon: ICONS.trend  },
-    { label: 'NL Query',          path: '/admin/nl-query',           icon: ICONS.search },
+    { label: 'SURAKSHA Intelligence', path: '/admin/nl-query',      icon: ICONS.search },
   ];
 
   // Admin — full access including user management and LLM analytics
@@ -161,7 +161,7 @@ const getMenuItems = (role) => {
     { label: 'Predicted Hotspots',path: '/admin/predicted-hotspots', icon: ICONS.shield },
     { label: 'Analytics',         path: '/admin/analytics',          icon: ICONS.chart  },
     { label: 'Crime Trends',      path: '/admin/trends',             icon: ICONS.trend  },
-    { label: 'NL Query',          path: '/admin/nl-query',           icon: ICONS.search },
+    { label: 'SURAKSHA Intelligence', path: '/admin/nl-query',      icon: ICONS.search },
     { label: 'Users',             path: '/admin/users',              icon: ICONS.users  },
     { label: 'LLM Analytics',     path: '/admin/llm-analytics',      icon: ICONS.brain  },
   ];

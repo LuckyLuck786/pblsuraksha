@@ -510,8 +510,8 @@ def export_complaints(request):
             data = [['ID', 'Title', 'Category', 'Priority', 'Status', 'Location', 'Created']]
             for c in qs[:200]:
                 data.append([
-                    c.complaint_id, c.title[:50], c.category, c.priority,
-                    c.status, c.incident_location[:30],
+                    c.complaint_id, c.title[:50], c.category or '', c.priority or '',
+                    c.status, (c.incident_location or '')[:30],
                     c.created_at.strftime('%d %b %Y') if c.created_at else '',
                 ])
 

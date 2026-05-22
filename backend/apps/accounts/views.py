@@ -212,9 +212,29 @@ def manage_user(request, pk):
 
     elif action == 'delete':
         username = target.username
-        target.delete()
-        _accounts_logger.info(f'Admin {request.user.username} deleted user {username}')
-        return Response({'message': f'User @{username} has been permanently deleted.'})
+        user_pk  = target.pk
+        try:
+            from django.db import connection
+            with connection.cursor() as cursor:
+                # Clear django admin log entries referencing this user (as actor or object)
+                cursor.execute(
+                    "DELETE FROM django_admin_log WHERE user_id = %s OR (content_type_id IN "
+                    "(SELECT id FROM django_content_type WHERE app_label='accounts' AND model='user') "
+                    "AND object_id = %s)",
+                    [user_pk, str(user_pk)]
+                )
+                # Clear any remaining orphan FK tables that Django ORM doesn't know about
+                for orphan_table in ('transport_transportrequest', 'transport_routewaypoint'):
+                    try:
+                        cursor.execute(f"DELETE FROM {orphan_table} WHERE user_id = %s", [user_pk])
+                    except Exception:
+                        pass  # Table may not exist — safe to ignore
+            target.delete()
+            _accounts_logger.info(f'Admin {request.user.username} deleted user {username}')
+            return Response({'message': f'User @{username} has been permanently deleted.'})
+        except Exception as exc:
+            _accounts_logger.error(f'Failed to delete user {username}: {exc}')
+            return Response({'error': f'Could not delete user: {exc}'}, status=500)
 
     return Response({'error': 'Invalid action. Use "block", "unblock", or "delete".'}, status=400)
 
